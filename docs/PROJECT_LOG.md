@@ -301,3 +301,24 @@ Ouvrir une pull request vers `main` pour déclencher les tests et la compilation
 - La compilation Android et l'assemblage APK doivent encore confirmer la validité de cette modification.
 - Aucun test visuel sur téléphone n'a encore été réalisé après ce changement ; l'utilisateur devra vérifier que le fond sombre couvre bien toute la zone située sous le menu.
 - Cette correction ne change pas le fonctionnement de l'import de ROM ni le moteur d'émulation.
+
+
+## 2026-11-02 — Léger agrandissement de l'image NES en jeu
+
+### Clarification utilisateur
+- L'utilisateur souhaite que l'image du jeu NES occupe un peu plus de place à l'écran pendant l'émulation, plutôt que de modifier uniquement le menu principal.
+
+### Fichier modifié
+- `app/src/main/jni/retro_frontend.cpp`
+
+### Modifications enregistrées
+- Le facteur d'échelle conserve le calcul d'ajustement à l'écran, puis applique un zoom centré de **8 %**.
+- Le rendu échantillonne désormais l'image source pour chaque pixel de la surface Android ; les bords sont recadrés de façon symétrique lorsque nécessaire.
+- Les proportions de l'image ne sont pas étirées : l'agrandissement réduit les marges noires au prix d'un léger recadrage des bords.
+- Les formats de surface RGB565 et RGBA/RGBX8888 conservent leurs chemins de conversion existants.
+
+### Vérification et limites
+- Modification enregistrée sur la branche `v2.3-touch-controls`.
+- Le workflow Android doit encore confirmer la compilation C++ native et l'assemblage de l'APK.
+- Aucun test visuel sur téléphone n'a encore été effectué ; il faudra vérifier que le zoom de 8 % est confortable et ne coupe aucun élément important du jeu.
+- Si le recadrage est trop important ou trop faible sur l'écran de l'utilisateur, le facteur de zoom pourra être ajusté.
