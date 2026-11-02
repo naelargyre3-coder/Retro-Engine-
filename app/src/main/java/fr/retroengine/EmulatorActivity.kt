@@ -55,6 +55,8 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private external fun nativeGetSampleRate(): Double
     private external fun nativeGetFps(): Double
     private external fun nativeSaveRam()
+    private external fun nativeSaveState(): String?
+    private external fun nativeLoadState(): String?
     private external fun nativeStop()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,7 +83,28 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             setPadding(12, 8, 12, 8)
             setBackgroundColor(0x99000000.toInt())
         }
-        root.addView(status, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+        val topBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setBackgroundColor(0x99000000.toInt())
+        }
+        topBar.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
+        val saveStateButton = Button(this).apply {
+            text = "SAUVER"
+            textSize = 10f
+            isAllCaps = false
+            setOnClickListener { performStateAction { nativeSaveState() } }
+        }
+        val loadStateButton = Button(this).apply {
+            text = "CHARGER"
+            textSize = 10f
+            isAllCaps = false
+            setOnClickListener { performStateAction { nativeLoadState() } }
+        }
+        topBar.addView(saveStateButton, LinearLayout.LayoutParams(-2, dp(42)))
+        topBar.addView(loadStateButton, LinearLayout.LayoutParams(-2, dp(42)))
+        root.addView(topBar, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
 
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -173,6 +196,14 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             nativeStop()
             nativeStarted = false
         }
+    }
+
+    private fun performStateAction(action: () -> String?) {
+        if (!nativeStarted) return
+        stopLoop()
+        val error = action()
+        status.text = error ?: "Sauvegarde d’état mise à jour"
+        startAudioAndLoop()
     }
 
     private fun startAudioAndLoop() {
