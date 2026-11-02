@@ -17,6 +17,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 
@@ -24,6 +26,9 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private lateinit var surfaceView: SurfaceView
     private val running = AtomicBoolean(false)
     @Volatile private var currentInputMask = 0
+    @Volatile private var touchInputMask = 0
+    @Volatile private var hardwareInputMask = 0
+    private val pressedHardwareKeys = mutableSetOf<Int>()
     private var renderThread: Thread? = null
     private var audioTrack: AudioTrack? = null
     private var nativeStarted = false
@@ -63,6 +68,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             finish()
             return
         }
+        enterImmersiveMode()
         buildScreen()
     }
 
@@ -108,7 +114,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             gravity = Gravity.CENTER
         }
         addControl(dpadMiddle, "◀", LEFT, 50, 50)
-        dpadMiddle.addView(View(this), LinearLayout.LayoutParams(dp(50), dp(50)))
+        dpadMiddle.addView(View(this), LinearLayout.LayoutParams(dp(54), dp(54)))
         addControl(dpadMiddle, "▶", RIGHT, 50, 50)
         dpad.addView(dpadMiddle)
 
@@ -118,7 +124,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         }
         addControl(dpadBottom, "▼", DOWN, 50, 50)
         dpad.addView(dpadBottom)
-        controls.addView(dpad, LinearLayout.LayoutParams(dp(150), -1))
+        controls.addView(dpad, LinearLayout.LayoutParams(dp(162), dp(162)))
 
         controls.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
 
@@ -130,7 +136,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         addControl(actionButtons, "B", B, 58, 58)
         addControl(actionButtons, "A", A, 58, 58)
         controls.addView(actionButtons)
-        root.addView(controls, FrameLayout.LayoutParams(-1, dp(132), Gravity.BOTTOM))
+        root.addView(controls, FrameLayout.LayoutParams(-1, dp(180), Gravity.BOTTOM))
         setContentView(root)
     }
 
@@ -163,8 +169,8 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     private fun updateInput(bit: Int, pressed: Boolean) {
-        currentInputMask = if (pressed) currentInputMask or bit else currentInputMask and bit.inv()
-        nativeSetInputMask(currentInputMask)
+        touchInputMask = if (pressed) touchInputMask or bit else touchInputMask and bit.inv()
+        publishInputMask()
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -261,19 +267,72 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         else -> 0
     }
 
+    private fun publishInputMask() {
+        currentInputMask = touchInputMask or hardwareInputMask
+        nativeSetInputMask(currentInputMask)
+    }
+
+    private fun refreshHardwareInputMask() {
+        var mask = 0
+        for (keyCode in pressedHardwareKeys) mask = mask or keyMask(keyCode)
+        hardwareInputMask = mask
+        publishInputMask()
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        val bit = keyMask(keyCode)
-        if (bit != 0) { updateInput(bit, true); return true }
+        if (keyMask(keyCode) != 0) {
+            pressedHardwareKeys.add(keyCode)
+            refreshHardwareInputMask()
+            return true
+        }
         return super.onKeyDown(keyCode, event)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        val bit = keyMask(keyCode)
-        if (bit != 0) { updateInput(bit, false); return true }
+        if (keyMask(keyCode) != 0) {
+            pressedHardwareKeys.remove(keyCode)
+            refreshHardwareInputMask()
+            return true
+        }
         return super.onKeyUp(keyCode, event)
     }
 
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.source and android.view.InputDevice.SOURCE_JOYSTICK == android.view.InputDevice.SOURCE_JOYSTICK && event.action == MotionEvent.ACTION_MOVE) {
+            var mask = 0
+            val x = event.getAxisValue(MotionEvent.AXIS_X)
+            val y = event.getAxisValue(MotionEvent.AXIS_Y)
+            val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+            val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+            if (x < -0.5f || hatX < -0.5f) mask = mask or LEFT
+            if (x > 0.5f || hatX > 0.5f) mask = mask or RIGHT
+            if (y < -0.5f || hatY < -0.5f) mask = mask or UP
+            if (y > 0.5f || hatY > 0.5f) mask = mask or DOWN
+            var keyBits = 0
+            for (keyCode in pressedHardwareKeys) keyBits = keyBits or keyMask(keyCode)
+            hardwareInputMask = keyBits or mask
+            publishInputMask()
+            return true
+        }
+        return super.onGenericMotionEvent(event)
+    }
+
+    private fun enterImmersiveMode() {
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enterImmersiveMode()
+    }
+
     override fun onPause() {
+        touchInputMask = 0
+        hardwareInputMask = 0
+        pressedHardwareKeys.clear()
         currentInputMask = 0
         if (nativeStarted) nativeSetInputMask(0)
         stopLoop()
