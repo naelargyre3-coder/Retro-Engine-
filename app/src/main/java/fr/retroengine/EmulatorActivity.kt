@@ -83,16 +83,26 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             setPadding(12, 8, 12, 8)
             setBackgroundColor(0x99000000.toInt())
         }
-        val topBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+        val topBar = FrameLayout(this).apply {
             setPadding(dp(8), dp(4), dp(8), dp(4))
             setBackgroundColor(0x99000000.toInt())
         }
-        topBar.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
-        // Commandes système NES placées dans la barre supérieure, comme sur la manette d'origine.
-        addControl(topBar, "SELECT", SELECT)
-        addControl(topBar, "START", START)
+        status.maxWidth = dp(150)
+        topBar.addView(status, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL))
+
+        // START et SELECT forment un groupe distinct, centré horizontalement en haut de l'écran.
+        val systemButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        addControl(systemButtons, "SELECT", SELECT)
+        addControl(systemButtons, "START", START)
+        topBar.addView(systemButtons, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+
+        val saveButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
         val saveStateButton = Button(this).apply {
             text = "SAUVER"
             textSize = 10f
@@ -105,8 +115,9 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             isAllCaps = false
             setOnClickListener { performStateAction("État restauré") { nativeLoadState() } }
         }
-        topBar.addView(saveStateButton, LinearLayout.LayoutParams(-2, dp(42)))
-        topBar.addView(loadStateButton, LinearLayout.LayoutParams(-2, dp(42)))
+        saveButtons.addView(saveStateButton, LinearLayout.LayoutParams(-2, dp(42)))
+        saveButtons.addView(loadStateButton, LinearLayout.LayoutParams(-2, dp(42)))
+        topBar.addView(saveButtons, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL))
         root.addView(topBar, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
 
         val controls = LinearLayout(this).apply {
@@ -115,14 +126,34 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             setPadding(18, 8, 18, 8)
             setBackgroundColor(0x66000000)
         }
-        val dpad = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
-        val horizontal = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        addControl(horizontal, "◀", LEFT)
-        addControl(horizontal, "▶", RIGHT)
-        addControl(dpad, "▲", UP)
-        dpad.addView(horizontal)
-        addControl(dpad, "▼", DOWN)
-        controls.addView(dpad)
+        // Croix en quatre directions, organisée en véritable forme de +.
+        val dpad = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+        }
+        val dpadTop = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        addControl(dpadTop, "▲", UP)
+        dpad.addView(dpadTop)
+
+        val dpadMiddle = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        addControl(dpadMiddle, "◀", LEFT)
+        dpadMiddle.addView(View(this), LinearLayout.LayoutParams(dp(12), 1))
+        addControl(dpadMiddle, "▶", RIGHT)
+        dpad.addView(dpadMiddle)
+
+        val dpadBottom = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        addControl(dpadBottom, "▼", DOWN)
+        dpad.addView(dpadBottom)
+        controls.addView(dpad, LinearLayout.LayoutParams(dp(150), -1))
         val spacer = View(this)
         controls.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
         // La NES ne possède que deux boutons d'action : B et A.

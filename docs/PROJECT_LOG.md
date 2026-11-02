@@ -100,3 +100,27 @@ Sécuriser l'accès à la fenêtre Android native lorsque le thread d'émulation
 - Aucun test sur téléphone n'a été effectué.
 - Cette correction élimine une condition de concurrence possible entre le rendu et le cycle de vie de la surface ; elle ne prouve pas à elle seule que la cause de l'écran noir est résolue.
 - Prochaine étape : vérifier la compilation complète, puis ajouter des diagnostics vidéo visibles/logués si l'image ne s'affiche toujours pas sur appareil.
+
+
+## 2026-11-02 — Repositionnement des commandes NES et croix directionnelle
+
+### Retour utilisateur
+- La croix directionnelle n'était pas perçue comme complète : l'utilisateur ne voyait que haut, bas et gauche.
+- START et SELECT doivent être groupés au centre de la partie supérieure de l'écran.
+
+### Fichier modifié
+- `app/src/main/java/fr/retroengine/EmulatorActivity.kt`
+
+### Modifications effectuées
+- Reconstruction de la croix tactile en trois rangées formant explicitement un « + » : haut au-dessus, gauche et droite sur la rangée centrale, bas en dessous.
+- Ajout explicite et maintien du bouton directionnel droit avec le bit `RIGHT`.
+- Création d'un groupe SELECT/START centré horizontalement dans la barre supérieure.
+- Conservation du statut à gauche et des commandes SAUVER/CHARGER à droite.
+- Conservation des boutons d'action B et A en bas à droite.
+
+### Vérification et limites
+- La modification du code et cette entrée de journal sont enregistrées ensemble sur `main`.
+- Le workflow du commit précédent `01e31a39832284bd0a0d37c640695aeba0a9b99a` a réussi : tests unitaires, compilation du cœur Nestopia ARM64, compilation du frontend natif, assemblage APK et vérification des bibliothèques/licences.
+- Le nouveau workflow doit vérifier cette modification d'interface.
+- Aucun test visuel sur téléphone n'a encore été effectué.
+- Le problème d'écran noir n'est pas déclaré résolu ; le correctif de synchronisation de surface est compilé, mais seul un essai sur appareil permettra de confirmer le rendu réel.
