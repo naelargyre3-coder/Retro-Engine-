@@ -34,6 +34,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var audioTrack: AudioTrack? = null
     private var nativeStarted = false
     private var romPath: String = ""
+    private var displayAspect: Int = 1
 
     companion object {
         init {
@@ -51,7 +52,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         private const val X = 1 shl 9
     }
 
-    private external fun nativeStart(surface: Surface, romPath: String, systemDir: String, saveDir: String): String?
+    private external fun nativeStart(surface: Surface, romPath: String, systemDir: String, saveDir: String, displayAspect: Int): String?
     private external fun nativeSetSurface(surface: Surface?)
     private external fun nativeRunFrame()
     private external fun nativeSetInputMask(mask: Int)
@@ -65,6 +66,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         romPath = intent.getStringExtra("rom_path").orEmpty()
+        displayAspect = intent.getIntExtra("display_aspect", 1).coerceIn(0, 1)
         if (romPath.isBlank()) {
             finish()
             return
@@ -176,7 +178,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         val saveDirectory = java.io.File(filesDir, "saves").apply { mkdirs() }
-        val error = nativeStart(holder.surface, romPath, filesDir.absolutePath, saveDirectory.absolutePath)
+        val error = nativeStart(holder.surface, romPath, filesDir.absolutePath, saveDirectory.absolutePath, displayAspect)
         if (error != null) {
             nativeStop()
             android.util.Log.e("RetroEngine", error)
