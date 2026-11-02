@@ -40,6 +40,9 @@ struct CoreApi {
     decltype(&retro_run) run = nullptr;
     decltype(&retro_get_memory_data) get_memory_data = nullptr;
     decltype(&retro_get_memory_size) get_memory_size = nullptr;
+    decltype(&retro_serialize_size) serialize_size = nullptr;
+    decltype(&retro_serialize) serialize = nullptr;
+    decltype(&retro_unserialize) unserialize = nullptr;
 } core;
 
 ANativeWindow *window = nullptr;
@@ -213,6 +216,48 @@ void loadSaveRam() {
     if (read != size) LOGE("SRAM existante incomplète : %zu/%zu octets", read, size);
 }
 
+std::string saveStateFile() {
+    if (!gameLoaded || !core.serialize_size || !core.serialize) return "Le cœur NES ne prend pas en charge les sauvegardes d’état.";
+    const size_t size = core.serialize_size();
+    if (size == 0 || size > 64 * 1024 * 1024) return "Taille de sauvegarde d’état invalide.";
+    std::vector<uint8_t> state(size);
+    if (!core.serialize(state.data(), state.size())) return "Nestopia n’a pas pu créer la sauvegarde d’état.";
+    const std::string path = currentSavePath + ".state";
+    const std::string temporary = path + ".tmp";
+    FILE *file = fopen(temporary.c_str(), "wb");
+    if (!file) return "Impossible de créer le fichier de sauvegarde d’état.";
+    const size_t written = fwrite(state.data(), 1, state.size(), file);
+    const bool flushed = fflush(file) == 0;
+    fclose(file);
+    if (written != state.size() || !flushed || rename(temporary.c_str(), path.c_str()) != 0) {
+        remove(temporary.c_str());
+        return "Échec de l’écriture de la sauvegarde d’état.";
+    }
+    return "";
+}
+
+std::string loadStateFile() {
+    if (!gameLoaded || !core.serialize_size || !core.unserialize) return "Le cœur NES ne prend pas en charge le chargement d’état.";
+    const std::string path = currentSavePath + ".state";
+    FILE *file = fopen(path.c_str(), "rb");
+    if (!file) return "Aucune sauvegarde d’état trouvée pour cette ROM.";
+    fseek(file, 0, SEEK_END);
+    const long fileSize = ftell(file);
+    rewind(file);
+    const size_t expected = core.serialize_size();
+    if (fileSize <= 0 || static_cast<size_t>(fileSize) != expected || expected > 64 * 1024 * 1024) {
+        fclose(file);
+        return "La sauvegarde d’état est invalide ou incompatible avec ce cœur.";
+    }
+    std::vector<uint8_t> state(expected);
+    const size_t read = fread(state.data(), 1, state.size(), file);
+    fclose(file);
+    if (read != state.size() || !core.unserialize(state.data(), state.size())) {
+        return "Nestopia n’a pas pu restaurer cette sauvegarde d’état.";
+    }
+    return "";
+}
+
 void saveSaveRam() {
     if (!gameLoaded || !core.get_memory_data || !core.get_memory_size || currentSavePath.empty()) return;
     void *memory = core.get_memory_data(RETRO_MEMORY_SAVE_RAM);
@@ -258,6 +303,9 @@ bool openCore() {
     LOAD(run);
     LOAD(get_memory_data);
     LOAD(get_memory_size);
+    LOAD(serialize_size);
+    LOAD(serialize);
+    LOAD(unserialize);
 #undef LOAD
     core.set_environment(environment);
     core.set_video_refresh(drawFrame);
@@ -388,6 +436,18 @@ Java_fr_retroengine_EmulatorActivity_nativeGetSampleRate(JNIEnv *, jobject) {
 extern "C" JNIEXPORT jdouble JNICALL
 Java_fr_retroengine_EmulatorActivity_nativeGetFps(JNIEnv *, jobject) {
     return fps;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_fr_retroengine_EmulatorActivity_nativeSaveState(JNIEnv *env, jobject) {
+    const std::string error = saveStateFile();
+    return error.empty() ? nullptr : env->NewStringUTF(error.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_fr_retroengine_EmulatorActivity_nativeLoadState(JNIEnv *env, jobject) {
+    const std::string error = loadStateFile();
+    return error.empty() ? nullptr : env->NewStringUTF(error.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
