@@ -417,3 +417,26 @@ Ajouter un vrai réglage sélectionnable depuis le menu et corriger l'image NES 
 
 ### Étape suivante
 - Compiler l'APK V2.3, l'installer sur le téléphone et vérifier que l'image remplit l'écran sans bandes noires gênantes.
+
+## 2026-11-02 — Suppression des bandes sombres derrière les commandes virtuelles
+
+### Retour utilisateur
+- L'utilisateur soupçonne que les bandes visibles proviennent des commandes tactiles.
+
+### Cause confirmée dans le code
+- La barre supérieure SELECT/START et le conteneur inférieur de la manette étaient des vues superposées à la surface vidéo.
+- Ces deux conteneurs appliquaient un fond noir semi-transparent sur toute la largeur, pouvant ressembler à des bordures.
+- La surface vidéo elle-même restait dimensionnée sur toute la zone de jeu ; les commandes ne réduisaient pas sa taille.
+
+### Fichier modifié
+- `app/src/main/java/fr/retroengine/EmulatorActivity.kt`
+
+### Correction enregistrée
+- Remplacement des fonds noirs semi-transparents des deux conteneurs par des fonds transparents.
+- Conservation des boutons tactiles individuels, de leurs zones de contact et de leur mappage d'entrée.
+- Le choix du ratio 16:9 et le rendu natif ne sont pas modifiés.
+
+### Vérification et limites
+- Modification enregistrée sur la branche `v2.3-touch-controls`.
+- La compilation CI et l'assemblage de l'APK restent à vérifier.
+- Aucun test visuel sur téléphone n'a encore été réalisé ; il faudra confirmer que les bandes sombres ont disparu sans gêner la visibilité des boutons.
