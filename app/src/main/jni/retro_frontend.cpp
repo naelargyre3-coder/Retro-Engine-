@@ -27,6 +27,7 @@ struct CoreApi {
     decltype(&retro_set_audio_sample_batch) set_audio_sample_batch = nullptr;
     decltype(&retro_set_input_poll) set_input_poll = nullptr;
     decltype(&retro_set_input_state) set_input_state = nullptr;
+    decltype(&retro_set_controller_port_device) set_controller_port_device = nullptr;
     decltype(&retro_init) init = nullptr;
     decltype(&retro_deinit) deinit = nullptr;
     decltype(&retro_get_system_info) get_system_info = nullptr;
@@ -198,6 +199,7 @@ bool openCore() {
     LOAD(set_audio_sample_batch);
     LOAD(set_input_poll);
     LOAD(set_input_state);
+    LOAD(set_controller_port_device);
     LOAD(init);
     LOAD(deinit);
     LOAD(get_system_info);
@@ -280,6 +282,7 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
         return env->NewStringUTF(lastError.c_str());
     }
     gameLoaded = true;
+    core.set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
     {
         std::lock_guard<std::mutex> lock(audioMutex);
         audioQueue.clear();
