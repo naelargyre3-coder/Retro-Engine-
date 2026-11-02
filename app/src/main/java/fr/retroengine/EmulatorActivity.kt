@@ -23,7 +23,6 @@ import kotlin.math.max
 
 class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private lateinit var surfaceView: SurfaceView
-    private lateinit var status: TextView
     private val running = AtomicBoolean(false)
     @Volatile private var currentInputMask = 0
     private var renderThread: Thread? = null
@@ -77,59 +76,26 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         surfaceView.holder.addCallback(this)
         root.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
 
-        status = TextView(this).apply {
-            text = "Initialisation du moteur NES…"
-            setTextColor(Color.WHITE)
-            textSize = 13f
-            setPadding(12, 8, 12, 8)
-            setBackgroundColor(0x99000000.toInt())
-        }
-        val topBar = FrameLayout(this).apply {
-            setPadding(dp(8), dp(4), dp(8), dp(4))
-            setBackgroundColor(0x99000000.toInt())
-        }
-        status.maxWidth = dp(230)
-        status.maxLines = 3
-        status.textSize = 10f
-        topBar.addView(status, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL))
-
-        // START et SELECT forment un groupe distinct, centré horizontalement en haut de l'écran.
-        val systemButtons = LinearLayout(this).apply {
+        // Barre supérieure épurée : uniquement SELECT et START, centrés.
+        val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setBackgroundColor(0x66000000)
         }
-        addControl(systemButtons, "SELECT", SELECT)
-        addControl(systemButtons, "START", START)
-        topBar.addView(systemButtons, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
-
-        val saveButtons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val saveStateButton = Button(this).apply {
-            text = "SAUVER"
-            textSize = 10f
-            isAllCaps = false
-            setOnClickListener { performStateAction("État sauvegardé") { nativeSaveState() } }
-        }
-        val loadStateButton = Button(this).apply {
-            text = "CHARGER"
-            textSize = 10f
-            isAllCaps = false
-            setOnClickListener { performStateAction("État restauré") { nativeLoadState() } }
-        }
-        saveButtons.addView(saveStateButton, LinearLayout.LayoutParams(-2, dp(42)))
-        saveButtons.addView(loadStateButton, LinearLayout.LayoutParams(-2, dp(42)))
-        topBar.addView(saveButtons, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL))
-        root.addView(topBar, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+        addControl(topBar, "SELECT", SELECT, 76, 42)
+        addControl(topBar, "START", START, 76, 42)
+        root.addView(topBar, FrameLayout.LayoutParams(-1, dp(52), Gravity.TOP))
 
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(18, 8, 18, 8)
+            setPadding(dp(18), dp(6), dp(18), dp(6))
             setBackgroundColor(0x66000000)
         }
-        // Croix en quatre directions, organisée en véritable forme de +.
+
+        // Croix directionnelle symétrique : les quatre directions ont exactement
+        // les mêmes dimensions et des zones tactiles identiques.
         val dpad = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -138,56 +104,65 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        addControl(dpadTop, "▲", UP)
+        addControl(dpadTop, "▲", UP, 50, 50)
         dpad.addView(dpadTop)
 
         val dpadMiddle = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER
         }
-        addControl(dpadMiddle, "◀", LEFT)
-        dpadMiddle.addView(View(this), LinearLayout.LayoutParams(dp(12), 1))
-        addControl(dpadMiddle, "▶", RIGHT)
+        addControl(dpadMiddle, "◀", LEFT, 50, 50)
+        dpadMiddle.addView(View(this), LinearLayout.LayoutParams(dp(50), dp(50)))
+        addControl(dpadMiddle, "▶", RIGHT, 50, 50)
         dpad.addView(dpadMiddle)
 
         val dpadBottom = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        addControl(dpadBottom, "▼", DOWN)
+        addControl(dpadBottom, "▼", DOWN, 50, 50)
         dpad.addView(dpadBottom)
         controls.addView(dpad, LinearLayout.LayoutParams(dp(150), -1))
-        val spacer = View(this)
-        controls.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
-        // La NES ne possède que deux boutons d'action : B et A.
-        val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        addControl(buttons, "B", B)
-        addControl(buttons, "A", A)
-        controls.addView(buttons)
-        root.addView(controls, FrameLayout.LayoutParams(-1, dp(116), Gravity.BOTTOM))
+
+        controls.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+
+        // Commandes d'action NES uniquement : B et A, de taille identique.
+        val actionButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        addControl(actionButtons, "B", B, 58, 58)
+        addControl(actionButtons, "A", A, 58, 58)
+        controls.addView(actionButtons)
+        root.addView(controls, FrameLayout.LayoutParams(-1, dp(132), Gravity.BOTTOM))
         setContentView(root)
     }
 
-    private fun addControl(parent: LinearLayout, label: String, bit: Int) {
-        val button = Button(this).apply {
+    private fun addControl(
+        parent: LinearLayout,
+        label: String,
+        bit: Int,
+        widthDp: Int,
+        heightDp: Int
+    ) {
+        val button = TextView(this).apply {
             text = label
-            textSize = if (label.length > 1) 10f else 18f
-            isAllCaps = false
+            gravity = Gravity.CENTER
+            textSize = if (label.length > 1) 10f else 19f
             setTextColor(Color.WHITE)
             setBackgroundColor(0xCC26384A.toInt())
-            setPadding(8, 0, 8, 0)
-            minWidth = dp(if (label.length > 1) 68 else 48)
-            minHeight = dp(42)
+            isClickable = true
+            isFocusable = true
             setOnTouchListener { _, event ->
                 when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> updateInput(bit, true)
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_UP -> updateInput(bit, false)
+                    MotionEvent.ACTION_DOWN -> updateInput(bit, true)
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> updateInput(bit, false)
                 }
                 true
             }
         }
-        parent.addView(button, LinearLayout.LayoutParams(-2, dp(46)).apply {
-            setMargins(dp(3), dp(2), dp(3), dp(2))
+        parent.addView(button, LinearLayout.LayoutParams(dp(widthDp), dp(heightDp)).apply {
+            setMargins(dp(2), dp(2), dp(2), dp(2))
         })
     }
 
