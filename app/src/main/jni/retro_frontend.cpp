@@ -196,28 +196,19 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
         return;
     }
 
-    // Le mode choisi dans le menu définit le viewport : 4:3 ou 16:9.
-    // L'image NES conserve son rapport d'affichage correct de 4:3 (pixel aspect ratio).
-    const float targetAspect = displayAspectMode.load() == 0 ? (4.0f / 3.0f) : (16.0f / 9.0f);
+    // L'image NES est calculée au rapport de présentation 4:3.
+    // En mode 16:9, « remplir » couvre toute la surface sans déformation :
+    // les bords excédentaires sont recadrés au centre, jamais remplacés par du noir.
+    // En mode 4:3, l'image entière reste visible et des marges peuvent subsister.
     const float surfaceWidth = static_cast<float>(buffer.width);
     const float surfaceHeight = static_cast<float>(buffer.height);
-    float viewportWidth = surfaceWidth;
-    float viewportHeight = surfaceHeight;
-    if (surfaceWidth / surfaceHeight > targetAspect) {
-        viewportWidth = surfaceHeight * targetAspect;
-    } else {
-        viewportHeight = surfaceWidth / targetAspect;
-    }
-    const float viewportLeft = (surfaceWidth - viewportWidth) * 0.5f;
-    const float viewportTop = (surfaceHeight - viewportHeight) * 0.5f;
-
-    // Correction du rapport de pixels NES : 256x240 doit être affiché en 4:3.
-    // En 16:9, l'image 4:3 est centrée dans le viewport ; aucune coupe ni déformation.
     const float displayWidth = static_cast<float>(height) * (4.0f / 3.0f);
-    const float scale = std::min(viewportWidth / displayWidth,
-                                 viewportHeight / static_cast<float>(height));
-    const float offsetX = (viewportWidth - displayWidth * scale) * 0.5f;
-    const float offsetY = (viewportHeight - static_cast<float>(height) * scale) * 0.5f;
+    const bool fillSurface = displayAspectMode.load() != 0;
+    const float scaleX = surfaceWidth / displayWidth;
+    const float scaleY = surfaceHeight / static_cast<float>(height);
+    const float scale = fillSurface ? std::max(scaleX, scaleY) : std::min(scaleX, scaleY);
+    const float offsetX = (surfaceWidth - displayWidth * scale) * 0.5f;
+    const float offsetY = (surfaceHeight - static_cast<float>(height) * scale) * 0.5f;
 
     auto *dst565 = output565 ? static_cast<uint16_t *>(buffer.bits) : nullptr;
     auto *dst8888 = output8888 ? static_cast<uint8_t *>(buffer.bits) : nullptr;
@@ -242,17 +233,13 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
         return;
     }
     for (int y = 0; y < buffer.height; ++y) {
-        const float localY = static_cast<float>(y) - viewportTop;
-        if (localY < 0.0f || localY >= viewportHeight) continue;
-        const float mappedY = (localY - offsetY) / scale;
+        const float mappedY = (static_cast<float>(y) - offsetY) / scale;
         if (mappedY < 0.0f || mappedY >= static_cast<float>(height)) continue;
         const unsigned sourceY = std::min(static_cast<unsigned>(mappedY), height - 1);
         auto *row565 = output565 ? dst565 + y * buffer.stride : nullptr;
         auto *row8888 = output8888 ? dst8888 + y * buffer.stride * 4 : nullptr;
         for (int x = 0; x < buffer.width; ++x) {
-            const float localX = static_cast<float>(x) - viewportLeft;
-            if (localX < 0.0f || localX >= viewportWidth) continue;
-            const float mappedDisplayX = (localX - offsetX) / scale;
+            const float mappedDisplayX = (static_cast<float>(x) - offsetX) / scale;
             if (mappedDisplayX < 0.0f || mappedDisplayX >= displayWidth) continue;
             const float mappedX = mappedDisplayX * static_cast<float>(width) / displayWidth;
             const unsigned sourceX = std::min(static_cast<unsigned>(mappedX), width - 1);
