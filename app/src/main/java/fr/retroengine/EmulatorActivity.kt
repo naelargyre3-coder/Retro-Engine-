@@ -330,6 +330,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         return super.onGenericMotionEvent(event)
     }
 
+    // Keep Android system bars hidden throughout the active gameplay window.
     private fun enterImmersiveMode() {
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
