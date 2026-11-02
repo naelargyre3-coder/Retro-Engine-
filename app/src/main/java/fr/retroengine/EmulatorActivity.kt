@@ -257,8 +257,14 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     override fun onPause() {
+        stopLoop()
         if (nativeStarted) nativeSaveRam()
         super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (nativeStarted && !running.get()) startAudioAndLoop()
     }
 
     override fun onDestroy() {
