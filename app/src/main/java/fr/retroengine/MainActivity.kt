@@ -13,11 +13,17 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
     private lateinit var resultText: TextView
     private lateinit var statusText: TextView
     private lateinit var coreText: TextView
+    private lateinit var playButton: Button
+    private var selectedRom: Uri? = null
+    private var nesCoreLoaded = false
+
     private val romPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) handleSelectedRom(uri)
     }
@@ -27,7 +33,9 @@ class MainActivity : ComponentActivity() {
         window.statusBarColor = 0xFF0B1018.toInt()
         window.navigationBarColor = 0xFF0B1018.toInt()
         buildScreen()
-        coreText.text = NestopiaCoreLoader.load().message
+        val coreStatus = NestopiaCoreLoader.load()
+        nesCoreLoaded = coreStatus.loaded
+        coreText.text = coreStatus.message
     }
 
     private fun buildScreen() {
@@ -46,6 +54,13 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(0xFF00D9FF.toInt())
             setOnClickListener { romPicker.launch(arrayOf("*/*")) }
         }
+        playButton = Button(this).apply {
+            text = "LANCER LE JEU NES"
+            setTextColor(0xFFFFFFFF.toInt())
+            setBackgroundColor(0xFF176B45.toInt())
+            visibility = View.GONE
+            setOnClickListener { selectedRom?.let { launchNesGame(it) } }
+        }
         coreText = makeText("Vérification du moteur NES…", 14f, 0xFF9EADBF.toInt())
         statusText = makeText("En attente d'un fichier ROM.", 16f, 0xFFFFFFFF.toInt(), true)
         resultText = makeText(
@@ -53,9 +68,8 @@ class MainActivity : ComponentActivity() {
             14f, 0xFFB9C5D3.toInt()
         )
         val notice = makeText(
-            "ÉTAT DE CETTE VERSION\nL'import local et la détection par extension sont disponibles. " +
-                "Le cœur natif NES est intégré, mais le frontend libretro Android n'est pas encore connecté. " +
-                "Aucun jeu ne peut donc être lancé pour le moment.",
+            "VERSION EXPÉRIMENTALE\nLe lancement NES utilise le cœur Nestopia et un frontend libretro Android. " +
+                "Les autres consoles sont uniquement détectées pour le moment.",
             13f, 0xFFFFD58A.toInt()
         )
         page.addView(title)
@@ -65,6 +79,7 @@ class MainActivity : ComponentActivity() {
         })
         page.addView(coreText, margin(0))
         page.addView(importButton, margin(20).apply { height = dp(54) })
+        page.addView(playButton, margin(10).apply { height = dp(54) })
         page.addView(statusText, margin(26))
         page.addView(resultText, margin(10))
         page.addView(notice, margin(34))
@@ -72,17 +87,22 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleSelectedRom(uri: Uri) {
+        selectedRom = uri
         try {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        } catch (_: SecurityException) {
-            // Some document providers do not support persistent URI permissions.
-        }
+        } catch (_: SecurityException) { }
         val details = queryFile(uri)
         val console = ConsoleDetector.detect(details.first)
         val nesInfo = if (console == ConsoleType.NES) {
             NesRomInspector.inspect(readHeader(uri), details.second)
         } else null
-        statusText.text = if (nesInfo?.isAccepted == false) "ROM NES À VÉRIFIER" else "FICHIER IMPORTÉ"
+        val playable = console == ConsoleType.NES && nesInfo?.isAccepted == true && nesCoreLoaded
+        playButton.visibility = if (playable) View.VISIBLE else View.GONE
+        statusText.text = when {
+            playable -> "ROM NES PRÊTE À ÊTRE LANCÉE"
+            nesInfo?.isAccepted == false -> "ROM NES À VÉRIFIER"
+            else -> "FICHIER IMPORTÉ"
+        }
         resultText.text = buildString {
             append("Nom : ").append(details.first)
             append("\nTaille : ").append(if (details.second >= 0) details.second.toString() + " octets" else "indisponible")
@@ -93,12 +113,27 @@ class MainActivity : ComponentActivity() {
                 if (nesInfo.prgRomBytes != null) append("\nPRG-ROM : ").append(nesInfo.prgRomBytes).append(" octets")
                 if (nesInfo.chrRomBytes != null) append("\nCHR-ROM : ").append(nesInfo.chrRomBytes).append(" octets")
                 append("\nFormat : ").append(nesInfo.format)
-                append("\n\nLe cœur NES est chargé séparément ; le frontend nécessaire au lancement n'est pas encore disponible.")
+                if (playable) append("\n\nLe frontend NES est disponible pour cette version expérimentale.")
             } else if (console == ConsoleType.UNKNOWN) {
                 append("\n\nCe format n'est pas reconnu par la détection actuelle.")
             } else {
-                append("\n\nLe fichier est identifié. Le lancement sera disponible lorsque le moteur de cette console sera intégré.")
+                append("\n\nCette console est détectée, mais son moteur n'est pas encore disponible.")
             }
+        }
+    }
+
+    private fun launchNesGame(uri: Uri) {
+        try {
+            val name = queryFile(uri).first.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val directory = File(cacheDir, "roms").apply { mkdirs() }
+            val destination = File(directory, if (name.endsWith(".nes", true)) name else "imported.nes")
+            contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(destination).use { output -> input.copyTo(output) }
+            } ?: throw IllegalStateException("Impossible d'ouvrir le fichier ROM.")
+            if (destination.length() <= 16L) throw IllegalStateException("Le fichier ROM est incomplet.")
+            startActivity(Intent(this, EmulatorActivity::class.java).putExtra("rom_path", destination.absolutePath))
+        } catch (error: Exception) {
+            statusText.text = "Impossible de préparer la ROM : ${error.message ?: "erreur inconnue"}"
         }
     }
 
