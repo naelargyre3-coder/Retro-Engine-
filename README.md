@@ -2,35 +2,43 @@
 
 Retro Engine est un atelier Android destiné à préparer des applications de jeu autonomes à partir de ROM compatibles.
 
-## Cahier des charges suivi
+## Objectif du projet
 
-- Architecture modulaire avec des moteurs séparés pour NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive / Genesis et Nintendo 64.
-- Import local de ROM, identification du format, validation et affichage des informations.
-- Personnalisation indépendante du nom et de l'icône de chaque jeu exporté.
-- Icône Retro Engine réservée à l'application de création, sans remplacer les icônes des jeux exportés.
-- Commandes tactiles configurables, prise en charge des manettes Android et masquage des commandes tactiles lorsqu'une manette utilisable est active.
-- Options graphiques proposées uniquement lorsqu'elles sont prises en charge par le moteur concerné.
-- Mode local pour importer et préparer les projets ; compilation d'APK dans un environnement de build connecté.
-- Pas de faux état de compilation, pas de faux boutons et pas de jeu annoncé comme fonctionnel avant validation réelle.
-- Pas de compte, de publicité ni d'analytique activés par défaut.
-- Android compileSdk 36 et targetSdk 36.
+- Importer localement une ROM, identifier sa console et contrôler son format.
+- Permettre la personnalisation du nom et de l'icône de chaque jeu exporté.
+- Générer des APK autonomes uniquement après une compilation et une vérification réelles.
+- Garder l'icône Retro Engine séparée des icônes des jeux exportés.
+- Proposer des commandes tactiles et des manettes Android.
+- Ajouter progressivement NES, SNES, Game Boy / Color, Game Boy Advance, Mega Drive / Genesis et Nintendo 64.
+- Respecter les licences des moteurs et ne pas intégrer de ROM ou BIOS propriétaires.
+- Ne pas afficher de faux états de compilation ou de fausses fonctions.
 
-## État actuel
+## État d'avancement
 
-**Socle Android :** projet Gradle, activité Android, import local par sélecteur de fichiers, détection des consoles par extension et tests unitaires.
+**Socle Android :** projet Gradle, import local par sélecteur de fichiers, détection des consoles et tests unitaires.
 
-**Première étape NES :** inspection de l'en-tête iNES, détection iNES / NES 2.0, lecture du mapper et des tailles PRG-ROM / CHR-ROM. Le décodage avancé des tailles NES 2.0 reste à compléter.
+**Inspection NES :** lecture de l'en-tête iNES, détection iNES / NES 2.0, lecture du mapper et des tailles PRG-ROM / CHR-ROM. Le décodage étendu NES 2.0 reste à compléter.
 
-**Cœur natif NES :** le workflow compile le cœur Nestopia libretro pour Android arm64-v8a depuis une révision source figée, puis le place dans l'APK avec sa notice GPL. L'application tente maintenant de charger cette bibliothèque au démarrage et affiche le résultat. Cela confirme uniquement le chargement de la bibliothèque native ; le frontend libretro Android n'est pas encore implémenté et aucun jeu ne peut être lancé à ce stade.
+**Cœur NES :** le workflow compile Nestopia libretro pour Android arm64-v8a depuis une révision source figée et intègre sa notice GPL.
 
-Révision Nestopia utilisée : `f1e02d12664834536edbf7352995a3d0cd1caef4` du dépôt [libretro/nestopia](https://github.com/libretro/nestopia). Le cœur est sous licence GPL-2.0-or-later ; la notice de licence est intégrée à l'APK et l'archive de la source correspondante est publiée avec l'artefact de compilation.
+**Frontend libretro Android — première implémentation :** une bibliothèque JNI distincte charge dynamiquement Nestopia, fournit les callbacks libretro vidéo/audio/entrée, lit une ROM depuis un fichier local, dessine les images dans une Surface Android et transmet le son à AudioTrack. L'écran d'émulation ajoute des commandes tactiles et accepte les événements de manettes/claviers Android.
+
+Cette première implémentation est expérimentale. Le build vérifie la compilation et la présence des deux bibliothèques natives dans l'APK, mais cela ne remplace pas un test d'exécution sur appareil. La compatibilité des options environnementales Nestopia, l'affichage réel, le son, les sauvegardes et les différents contrôleurs doivent encore être validés sur un téléphone. La cible native actuelle est arm64-v8a uniquement.
 
 ## Compilation
 
-Le workflow GitHub Actions exécute les tests, compile le cœur natif Nestopia, construit l'APK debug et vérifie que la bibliothèque native ainsi que sa notice de licence sont présentes dans l'APK. Les artefacts comprennent l'APK, la bibliothèque native et l'archive de la source correspondante.
+GitHub Actions exécute les tests unitaires, compile Nestopia, compile le frontend Android, construit l'APK debug et vérifie la présence des deux bibliothèques natives et de la licence. Les artefacts incluent l'APK, les bibliothèques et l'archive de la source Nestopia correspondante.
 
-## Fonctions non encore disponibles
+## Limites restantes
 
-Le frontend libretro, l'exécution des jeux dans l'application, les options graphiques avancées, les profils de manettes, la génération et la signature d'APK autonomes par ROM et l'historique restent à intégrer et à tester. Ces fonctions ne sont pas simulées.
+- Pas encore de génération d'APK autonome par ROM.
+- Pas encore d'interface de personnalisation de jeu.
+- Pas encore de système de sauvegardes/savestates exposé à l'utilisateur.
+- Pas encore de filtres graphiques.
+- Pas encore de moteurs intégrés pour les autres consoles.
+- Pas encore de signature de production ni de pipeline de publication.
+- Le logo officiel `retro_engine_logo.png` doit encore être intégré aux ressources de l'application ; il ne sera pas imposé aux jeux exportés.
 
-L'image officielle `retro_engine_logo.png` doit encore être ajoutée aux ressources Android dès que le fichier binaire peut être transféré dans le dépôt. Elle ne sera pas utilisée comme icône des jeux exportés.
+## Licences
+
+Nestopia est intégré selon sa licence GPL, avec la notice et la révision source fournies dans les artefacts. Les déclarations API libretro de `libretro_minimal.h` sont dérivées de l'en-tête officiel [libretro.h](https://github.com/libretro/RetroArch/blob/master/libretro-common/include/libretro.h), distribué sous licence MIT.
