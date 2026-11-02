@@ -38,6 +38,7 @@ struct CoreApi {
 
 ANativeWindow *window = nullptr;
 std::vector<uint8_t> romBytes;
+std::string currentRomPath;
 std::string systemDirectory;
 std::string saveDirectory;
 std::string lastError;
@@ -263,7 +264,7 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
     romBytes.resize(static_cast<size_t>(fileSize));
     const size_t read = fread(romBytes.data(), 1, romBytes.size(), file);
     fclose(file);
-    const std::string gamePath(path);
+    currentRomPath = path;
     env->ReleaseStringUTFChars(romPath, path);
     if (read != romBytes.size()) return env->NewStringUTF("Lecture incomplète de la ROM.");
 
@@ -271,7 +272,7 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
     retro_system_info systemInfo{};
     core.get_system_info(&systemInfo);
     retro_game_info game{};
-    game.path = gamePath.c_str();
+    game.path = currentRomPath.c_str();
     game.data = systemInfo.need_fullpath ? nullptr : romBytes.data();
     game.size = systemInfo.need_fullpath ? 0 : romBytes.size();
     if (!core.load_game(&game)) {
@@ -343,6 +344,7 @@ Java_fr_retroengine_EmulatorActivity_nativeStop(JNIEnv *, jobject) {
     if (window) ANativeWindow_release(window);
     window = nullptr;
     romBytes.clear();
+    currentRomPath.clear();
     {
         std::lock_guard<std::mutex> lock(audioMutex);
         audioQueue.clear();
