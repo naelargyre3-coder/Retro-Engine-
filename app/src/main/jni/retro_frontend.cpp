@@ -211,9 +211,9 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
     const float viewportLeft = (surfaceWidth - viewportWidth) * 0.5f;
     const float viewportTop = (surfaceHeight - viewportHeight) * 0.5f;
 
-    // "Cover" : conserve les proportions de la source et recadre le surplus
-    // pour remplir exactement le viewport 16:9.
-    const float scale = std::max(viewportWidth / static_cast<float>(width),
+    // "Contain" : conserve l'intégralité de l'image source dans le viewport 16:9.
+    // Les bandes restantes restent noires : aucun zoom de recadrage, aucune déformation.
+    const float scale = std::min(viewportWidth / static_cast<float>(width),
                                  viewportHeight / static_cast<float>(height));
     const float offsetX = (viewportWidth - static_cast<float>(width) * scale) * 0.5f;
     const float offsetY = (viewportHeight - static_cast<float>(height) * scale) * 0.5f;
