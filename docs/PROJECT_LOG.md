@@ -194,3 +194,36 @@ Installer l'APK CI sur le téléphone, lancer une ROM NES et relever les compteu
 - La correction du nom est enregistrée dans le code source ; elle ne prouve pas encore que le cœur se lance sur le téléphone.
 - Le workflow CI doit confirmer la compilation native et l'assemblage APK.
 - Après installation, vérifier que le message « symbole libretro manquant » a disparu, puis confirmer l'affichage et le son d'une ROM NES.
+
+
+## 2026-11-02 — Préparation de la version de test V2.3
+
+### Objectifs utilisateur
+- Supprimer les informations techniques affichées en haut à gauche pendant le jeu.
+- Supprimer les commandes manuelles « SAUVER » et « CHARGER ».
+- Conserver les sauvegardes de jeu dans le stockage privé de Retro Engine.
+- Corriger la manette tactile NES : quatre directions identiques, alignées et avec des zones tactiles de même taille.
+- Garder uniquement A/B en bas à droite et SELECT/START centrés en haut.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/EmulatorActivity.kt`
+- `app/build.gradle`
+
+### Modifications enregistrées
+- Barre supérieure réduite au groupe SELECT/START centré ; le panneau de diagnostic visible a été retiré.
+- Croix directionnelle reconstruite avec quatre boutons de 50 × 50 dp et un espacement central symétrique.
+- Boutons A et B définis à 58 × 58 dp.
+- SELECT et START définis à 76 × 42 dp.
+- Suppression des boutons tactiles de sauvegarde/chargement d'état.
+- Conservation de la sauvegarde SRAM automatique lors de la mise en pause, dans le répertoire privé `filesDir/saves`.
+- Numéro de version Android réglé sur `2.3` (versionCode 3).
+
+### Vérification et limites
+- Modifications enregistrées sur la branche `v2.3-touch-controls`.
+- La compilation Android, les tests automatisés et l'inspection de l'APK restent à exécuter par le workflow CI.
+- Aucun test tactile réel sur téléphone n'a encore été effectué ; l'efficacité des zones tactiles doit être confirmée après installation.
+- Les sauvegardes SRAM restent dans les données privées de l'application, pas dans le fichier APK lui-même. La désinstallation de l'application peut supprimer ces données.
+- Le retrait des commandes manuelles ne garantit pas à lui seul la persistance d'une sauvegarde d'état instantanée : la sauvegarde automatique existante concerne la SRAM du jeu.
+
+### Étape suivante
+Ouvrir une pull request vers `main` pour déclencher les tests et la compilation de l'APK V2.3, puis installer cette version sur téléphone pour valider les commandes tactiles et la persistance des sauvegardes.
