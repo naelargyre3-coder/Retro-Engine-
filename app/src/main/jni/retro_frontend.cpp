@@ -58,6 +58,7 @@ std::mutex audioMutex;
 std::deque<int16_t> audioQueue;
 std::atomic<int> inputMask{0};
 std::atomic<int> pixelFormat{RETRO_PIXEL_FORMAT_RGB565};
+std::atomic<int> displayAspectMode{1};
 std::atomic<unsigned> videoCallbackCount{0};
 std::atomic<unsigned> frameRunCount{0};
 std::atomic<unsigned> windowLockFailures{0};
@@ -195,10 +196,9 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
         return;
     }
 
-    // Mode d'affichage par défaut : 16:9, centré dans la surface Android.
-    // Le contenu source est recadré uniformément pour remplir ce viewport ; aucun
-    // pixel de bord n'est étiré sur les zones extérieures au viewport.
-    constexpr float targetAspect = 16.0f / 9.0f;
+    // Le mode choisi dans le menu définit le viewport : 4:3 ou 16:9.
+    // L'image NES conserve son rapport d'affichage correct de 4:3 (pixel aspect ratio).
+    const float targetAspect = displayAspectMode.load() == 0 ? (4.0f / 3.0f) : (16.0f / 9.0f);
     const float surfaceWidth = static_cast<float>(buffer.width);
     const float surfaceHeight = static_cast<float>(buffer.height);
     float viewportWidth = surfaceWidth;
@@ -211,11 +211,12 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
     const float viewportLeft = (surfaceWidth - viewportWidth) * 0.5f;
     const float viewportTop = (surfaceHeight - viewportHeight) * 0.5f;
 
-    // "Contain" : conserve l'intégralité de l'image source dans le viewport 16:9.
-    // Les bandes restantes restent noires : aucun zoom de recadrage, aucune déformation.
-    const float scale = std::min(viewportWidth / static_cast<float>(width),
+    // Correction du rapport de pixels NES : 256x240 doit être affiché en 4:3.
+    // En 16:9, l'image 4:3 est centrée dans le viewport ; aucune coupe ni déformation.
+    const float displayWidth = static_cast<float>(height) * (4.0f / 3.0f);
+    const float scale = std::min(viewportWidth / displayWidth,
                                  viewportHeight / static_cast<float>(height));
-    const float offsetX = (viewportWidth - static_cast<float>(width) * scale) * 0.5f;
+    const float offsetX = (viewportWidth - displayWidth * scale) * 0.5f;
     const float offsetY = (viewportHeight - static_cast<float>(height) * scale) * 0.5f;
 
     auto *dst565 = output565 ? static_cast<uint16_t *>(buffer.bits) : nullptr;
@@ -251,8 +252,9 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
         for (int x = 0; x < buffer.width; ++x) {
             const float localX = static_cast<float>(x) - viewportLeft;
             if (localX < 0.0f || localX >= viewportWidth) continue;
-            const float mappedX = (localX - offsetX) / scale;
-            if (mappedX < 0.0f || mappedX >= static_cast<float>(width)) continue;
+            const float mappedDisplayX = (localX - offsetX) / scale;
+            if (mappedDisplayX < 0.0f || mappedDisplayX >= displayWidth) continue;
+            const float mappedX = mappedDisplayX * static_cast<float>(width) / displayWidth;
             const unsigned sourceX = std::min(static_cast<unsigned>(mappedX), width - 1);
             const uint8_t *p = source + sourceY * pitch;
             uint8_t r = 0, g = 0, b = 0;
@@ -436,9 +438,11 @@ bool openCore() {
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject surface,
-                                                  jstring romPath, jstring systemDir, jstring saveDir) {
+                                                  jstring romPath, jstring systemDir, jstring saveDir,
+                                                  jint aspectMode) {
     lastError.clear();
-    LOGI("nativeStart appelé : initialisation du moteur NES.");
+    displayAspectMode.store(aspectMode == 0 ? 0 : 1);
+    LOGI("nativeStart appelé : initialisation du moteur NES (ratio %s).", aspectMode == 0 ? "4:3" : "16:9");
     videoCallbackCount.store(0);
     frameRunCount.store(0);
     windowLockFailures.store(0);
