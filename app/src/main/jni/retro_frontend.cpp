@@ -46,6 +46,7 @@ struct CoreApi {
 } core;
 
 ANativeWindow *window = nullptr;
+std::mutex windowMutex;
 std::vector<uint8_t> romBytes;
 std::string currentRomPath;
 std::string currentSavePath;
@@ -143,7 +144,9 @@ size_t audioBatch(const int16_t *data, size_t frames) {
 }
 
 void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) {
-    if (!data || width == 0 || height == 0 || !window) return;
+    if (!data || width == 0 || height == 0) return;
+    std::lock_guard<std::mutex> windowLock(windowMutex);
+    if (!window) return;
     ANativeWindow_Buffer buffer{};
     if (ANativeWindow_lock(window, &buffer, nullptr) != 0) return;
 
@@ -342,10 +345,14 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
     if (sys) env->ReleaseStringUTFChars(systemDir, sys);
     if (save) env->ReleaseStringUTFChars(saveDir, save);
 
-    if (window) ANativeWindow_release(window);
-    window = ANativeWindow_fromSurface(env, surface);
-    if (!window) lastError = "Surface Android indisponible.";
-    else ANativeWindow_setBuffersGeometry(window, 0, 0, WINDOW_FORMAT_RGB_565);
+    ANativeWindow *nextWindow = ANativeWindow_fromSurface(env, surface);
+    {
+        std::lock_guard<std::mutex> windowLock(windowMutex);
+        if (window) ANativeWindow_release(window);
+        window = nextWindow;
+        if (window) ANativeWindow_setBuffersGeometry(window, 0, 0, WINDOW_FORMAT_RGB_565);
+    }
+    if (!nextWindow) lastError = "Surface Android indisponible.";
     if (!lastError.empty()) return env->NewStringUTF(lastError.c_str());
 
     const char *path = env->GetStringUTFChars(romPath, nullptr);
@@ -396,6 +403,7 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
 extern "C" JNIEXPORT void JNICALL
 Java_fr_retroengine_EmulatorActivity_nativeSetSurface(JNIEnv *env, jobject, jobject surface) {
     ANativeWindow *next = surface ? ANativeWindow_fromSurface(env, surface) : nullptr;
+    std::lock_guard<std::mutex> windowLock(windowMutex);
     if (window) ANativeWindow_release(window);
     window = next;
     if (window) ANativeWindow_setBuffersGeometry(window, 0, 0, WINDOW_FORMAT_RGB_565);
@@ -465,8 +473,11 @@ Java_fr_retroengine_EmulatorActivity_nativeStop(JNIEnv *, jobject) {
     initialized = false;
     if (core.handle) dlclose(core.handle);
     core = CoreApi{};
-    if (window) ANativeWindow_release(window);
-    window = nullptr;
+    {
+        std::lock_guard<std::mutex> windowLock(windowMutex);
+        if (window) ANativeWindow_release(window);
+        window = nullptr;
+    }
     romBytes.clear();
     currentRomPath.clear();
     currentSavePath.clear();

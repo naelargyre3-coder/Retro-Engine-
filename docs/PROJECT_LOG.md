@@ -76,3 +76,27 @@ Appliquer le retour utilisateur sur la manette tactile : une disposition propre 
 - Le workflow Android déclenché par ce commit doit encore confirmer la compilation et les tests.
 - Aucun test visuel ni test de manipulation sur téléphone n'a été effectué ici.
 - Cette modification ne corrige pas encore le problème signalé précédemment concernant l'image du jeu qui ne s'affiche pas ; ce problème nécessite un diagnostic distinct sur appareil avec des journaux d'exécution.
+
+
+## 2026-11-02 — Synchronisation du cycle de vie de la surface vidéo native
+
+### Objectif
+Sécuriser l'accès à la fenêtre Android native lorsque le thread d'émulation dessine une image pendant qu'Android signale un changement ou une destruction de surface.
+
+### Fichiers modifiés
+- `app/src/main/jni/retro_frontend.cpp`
+- `docs/PROJECT_LOG.md`
+
+### Modifications effectuées
+- Ajout d'un mutex dédié à la fenêtre `ANativeWindow`.
+- Protection de l'accès et du rendu vidéo dans `drawFrame`.
+- Protection du remplacement de la fenêtre dans `nativeStart` et `nativeSetSurface`.
+- Protection de la libération de la fenêtre dans `nativeStop`.
+- Le verrou est conservé pendant le dessin et la publication du buffer afin d'empêcher qu'une fenêtre soit libérée pendant son utilisation.
+
+### Vérification et limites
+- Modification enregistrée dans un commit unique afin que le journal et le code restent synchronisés.
+- Les tests unitaires du workflow précédent ont réussi ; la compilation native et la création de l'APK de cette nouvelle modification doivent être vérifiées par le workflow déclenché par ce commit.
+- Aucun test sur téléphone n'a été effectué.
+- Cette correction élimine une condition de concurrence possible entre le rendu et le cycle de vie de la surface ; elle ne prouve pas à elle seule que la cause de l'écran noir est résolue.
+- Prochaine étape : vérifier la compilation complète, puis ajouter des diagnostics vidéo visibles/logués si l'image ne s'affiche toujours pas sur appareil.
