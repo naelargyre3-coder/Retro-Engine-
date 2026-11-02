@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <atomic>
 #include <cstring>
 #include <deque>
 #include <mutex>
@@ -144,10 +146,10 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
     const int drawHeight = std::max(1, static_cast<int>(height * scale));
     const int offsetX = (buffer.width - drawWidth) / 2;
     const int offsetY = (buffer.height - drawHeight) / 2;
-    auto *dst = static_cast<uint32_t *>(buffer.bits);
+    auto *dst = static_cast<uint16_t *>(buffer.bits);
     for (int y = 0; y < buffer.height; ++y) {
         auto *row = dst + y * buffer.stride;
-        std::fill(row, row + buffer.width, 0xFF000000u);
+        std::fill(row, row + buffer.width, static_cast<uint16_t>(0));
     }
 
     const int format = pixelFormat.load();
@@ -157,28 +159,28 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
         auto *row = dst + (offsetY + y) * buffer.stride;
         for (int x = 0; x < drawWidth; ++x) {
             const unsigned sourceX = std::min(width - 1, static_cast<unsigned>(x / scale));
-            uint32_t color = 0xFF000000u;
+            uint8_t r = 0, g = 0, b = 0;
             const uint8_t *p = source + sourceY * pitch;
             if (format == RETRO_PIXEL_FORMAT_XRGB8888) {
                 uint32_t raw;
                 std::memcpy(&raw, p + sourceX * 4, sizeof(raw));
-                color = 0xFF000000u | (raw & 0x00FFFFFFu);
+                r = static_cast<uint8_t>((raw >> 16) & 0xff);
+                g = static_cast<uint8_t>((raw >> 8) & 0xff);
+                b = static_cast<uint8_t>(raw & 0xff);
             } else if (format == RETRO_PIXEL_FORMAT_RGB565) {
                 uint16_t raw;
                 std::memcpy(&raw, p + sourceX * 2, sizeof(raw));
-                const uint8_t r = static_cast<uint8_t>(((raw >> 11) & 0x1F) * 255 / 31);
-                const uint8_t g = static_cast<uint8_t>(((raw >> 5) & 0x3F) * 255 / 63);
-                const uint8_t b = static_cast<uint8_t>((raw & 0x1F) * 255 / 31);
-                color |= (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
+                r = static_cast<uint8_t>(((raw >> 11) & 0x1F) * 255 / 31);
+                g = static_cast<uint8_t>(((raw >> 5) & 0x3F) * 255 / 63);
+                b = static_cast<uint8_t>((raw & 0x1F) * 255 / 31);
             } else {
                 uint16_t raw;
                 std::memcpy(&raw, p + sourceX * 2, sizeof(raw));
-                const uint8_t r = static_cast<uint8_t>(((raw >> 10) & 0x1F) * 255 / 31);
-                const uint8_t g = static_cast<uint8_t>(((raw >> 5) & 0x1F) * 255 / 31);
-                const uint8_t b = static_cast<uint8_t>((raw & 0x1F) * 255 / 31);
-                color |= (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
+                r = static_cast<uint8_t>(((raw >> 10) & 0x1F) * 255 / 31);
+                g = static_cast<uint8_t>(((raw >> 5) & 0x1F) * 255 / 31);
+                b = static_cast<uint8_t>((raw & 0x1F) * 255 / 31);
             }
-            row[offsetX + x] = color;
+            row[offsetX + x] = static_cast<uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
         }
     }
     ANativeWindow_unlockAndPost(window);
@@ -243,6 +245,7 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
     if (window) ANativeWindow_release(window);
     window = ANativeWindow_fromSurface(env, surface);
     if (!window) lastError = "Surface Android indisponible.";
+    else ANativeWindow_setBuffersGeometry(window, 0, 0, WINDOW_FORMAT_RGB_565);
     if (!lastError.empty()) return env->NewStringUTF(lastError.c_str());
 
     const char *path = env->GetStringUTFChars(romPath, nullptr);
@@ -268,10 +271,12 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
     if (read != romBytes.size()) return env->NewStringUTF("Lecture incomplète de la ROM.");
 
     if (!openCore()) return env->NewStringUTF(lastError.c_str());
+    retro_system_info systemInfo{};
+    core.get_system_info(&systemInfo);
     retro_game_info game{};
     game.path = gamePath.c_str();
-    game.data = romBytes.data();
-    game.size = romBytes.size();
+    game.data = systemInfo.need_fullpath ? nullptr : romBytes.data();
+    game.size = systemInfo.need_fullpath ? 0 : romBytes.size();
     if (!core.load_game(&game)) {
         lastError = "Nestopia a refusé cette ROM. Vérifie son format et son intégrité.";
         return env->NewStringUTF(lastError.c_str());
