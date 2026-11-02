@@ -273,3 +273,9 @@ Ouvrir une pull request vers `main` pour déclencher les tests et la compilation
 3. Tester une manette physique : croix, stick analogique, boutons et combinaisons simultanées.
 4. Vérifier que les barres Android restent masquées pendant le jeu.
 5. Confirmer si les marges noires latérales doivent être conservées (image non déformée) ou si l’utilisateur préfère un affichage étiré.
+
+
+### Test utilisateur — sauvegarde de The Legend of Zelda (2 novembre 2026)
+- L'utilisateur confirme que la sauvegarde fonctionne avec **The Legend of Zelda (NES)** dans Retro Engine.
+- Ce résultat valide le fonctionnement de la sauvegarde SRAM pour ce jeu dans l'environnement testé.
+- Cela ne prouve pas encore que tous les jeux NES sauvegardent correctement : le comportement dépend du système de sauvegarde de chaque cartouche.
