@@ -461,3 +461,23 @@ Ajouter un vrai réglage sélectionnable depuis le menu et corriger l'image NES 
 - Modification enregistrée sur la branche `v2.3-touch-controls`.
 - Compilation CI, assemblage APK et contrôle visuel sur téléphone à effectuer.
 - Aucun résultat de test sur appareil n'est revendiqué.
+
+
+## 2026-11-02 — Vérification CI du cadre 16:9 centré
+
+### Contrôle du comportement
+- Relecture de `drawFrame` dans `app/src/main/jni/retro_frontend.cpp` : le mode 16:9 calcule un viewport 16:9 centré dans la surface Android.
+- L'image NES est mise à l'échelle uniformément en mode « contain » à l'intérieur de ce viewport, en conservant le rapport de présentation 4:3.
+- Le buffer est initialisé en noir avant le dessin ; les zones non occupées restent donc noires.
+- Les conteneurs des commandes tactiles restent transparents dans `EmulatorActivity.kt`, sans modifier le rendu vidéo.
+
+### Vérification automatisée
+- Workflow Android GitHub Actions n°78, commit testé : `7dbe2faacdf66982fea301455043c474043acd5f`.
+- Résultat : **succès**.
+- Étapes confirmées : tests unitaires, compilation du cœur Nestopia arm64-v8a, compilation du frontend natif arm64-v8a, assemblage de l'APK debug et vérification des bibliothèques natives et licences.
+- Artefact APK téléversé par le workflow.
+
+### Limites restantes
+- La CI confirme la compilation et les contrôles automatisés, pas le rendu visuel sur un téléphone.
+- Le cadre 16:9 est un viewport logique : il n'est pas dessiné comme un contour décoratif. L'image 4:3 est centrée à l'intérieur, avec des marges noires latérales.
+- Le test sur appareil reste nécessaire pour confirmer le résultat réel sur l'écran cible.
