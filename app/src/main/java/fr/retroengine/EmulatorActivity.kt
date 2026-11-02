@@ -28,6 +28,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     @Volatile private var currentInputMask = 0
     @Volatile private var touchInputMask = 0
     @Volatile private var hardwareInputMask = 0
+    @Volatile private var hardwareAxisMask = 0
     private val pressedHardwareKeys = mutableSetOf<Int>()
     private var renderThread: Thread? = null
     private var audioTrack: AudioTrack? = null
@@ -275,7 +276,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private fun refreshHardwareInputMask() {
         var mask = 0
         for (keyCode in pressedHardwareKeys) mask = mask or keyMask(keyCode)
-        hardwareInputMask = mask
+        hardwareInputMask = mask or hardwareAxisMask
         publishInputMask()
     }
 
@@ -310,7 +311,8 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             if (y > 0.5f || hatY > 0.5f) mask = mask or DOWN
             var keyBits = 0
             for (keyCode in pressedHardwareKeys) keyBits = keyBits or keyMask(keyCode)
-            hardwareInputMask = keyBits or mask
+            hardwareAxisMask = mask
+            hardwareInputMask = keyBits or hardwareAxisMask
             publishInputMask()
             return true
         }
@@ -332,6 +334,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     override fun onPause() {
         touchInputMask = 0
         hardwareInputMask = 0
+        hardwareAxisMask = 0
         pressedHardwareKeys.clear()
         currentInputMask = 0
         if (nativeStarted) nativeSetInputMask(0)
