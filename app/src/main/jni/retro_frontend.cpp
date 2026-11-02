@@ -195,13 +195,28 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
         return;
     }
 
-    // Léger zoom centré pour réduire les bandes noires sans étirer l'image.
-    // Le facteur 1.08 agrandit l'image de 8 % et recadre symétriquement les bords.
-    const float scale = std::min(
-        static_cast<float>(buffer.width) / static_cast<float>(width),
-        static_cast<float>(buffer.height) / static_cast<float>(height)) * 1.08f;
-    const float offsetX = (static_cast<float>(buffer.width) - width * scale) / 2.0f;
-    const float offsetY = (static_cast<float>(buffer.height) - height * scale) / 2.0f;
+    // Mode d'affichage par défaut : 16:9, centré dans la surface Android.
+    // Le contenu source est recadré uniformément pour remplir ce viewport ; aucun
+    // pixel de bord n'est étiré sur les zones extérieures au viewport.
+    constexpr float targetAspect = 16.0f / 9.0f;
+    const float surfaceWidth = static_cast<float>(buffer.width);
+    const float surfaceHeight = static_cast<float>(buffer.height);
+    float viewportWidth = surfaceWidth;
+    float viewportHeight = surfaceHeight;
+    if (surfaceWidth / surfaceHeight > targetAspect) {
+        viewportWidth = surfaceHeight * targetAspect;
+    } else {
+        viewportHeight = surfaceWidth / targetAspect;
+    }
+    const float viewportLeft = (surfaceWidth - viewportWidth) * 0.5f;
+    const float viewportTop = (surfaceHeight - viewportHeight) * 0.5f;
+
+    // "Cover" : conserve les proportions de la source et recadre le surplus
+    // pour remplir exactement le viewport 16:9.
+    const float scale = std::max(viewportWidth / static_cast<float>(width),
+                                 viewportHeight / static_cast<float>(height));
+    const float offsetX = (viewportWidth - static_cast<float>(width) * scale) * 0.5f;
+    const float offsetY = (viewportHeight - static_cast<float>(height) * scale) * 0.5f;
 
     auto *dst565 = output565 ? static_cast<uint16_t *>(buffer.bits) : nullptr;
     auto *dst8888 = output8888 ? static_cast<uint8_t *>(buffer.bits) : nullptr;
@@ -217,16 +232,28 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
     }
 
     const auto *source = static_cast<const uint8_t *>(data);
+    const float sourceBytesPerPixel =
+        sourceFormat == RETRO_PIXEL_FORMAT_XRGB8888 ? 4.0f : 2.0f;
+    if (pitch < static_cast<size_t>(width) * static_cast<size_t>(sourceBytesPerPixel)) {
+        const int postResult = ANativeWindow_unlockAndPost(window);
+        if (postResult != 0) windowPostFailures.fetch_add(1);
+        LOGE("Pitch source invalide : %zu pour une largeur de %u.", pitch, width);
+        return;
+    }
     for (int y = 0; y < buffer.height; ++y) {
-        const float mappedY = std::clamp((static_cast<float>(y) - offsetY) / scale, 0.0f,
-                                         static_cast<float>(height - 1));
-        const unsigned sourceY = static_cast<unsigned>(mappedY);
+        const float localY = static_cast<float>(y) - viewportTop;
+        if (localY < 0.0f || localY >= viewportHeight) continue;
+        const float mappedY = (localY - offsetY) / scale;
+        if (mappedY < 0.0f || mappedY >= static_cast<float>(height)) continue;
+        const unsigned sourceY = std::min(static_cast<unsigned>(mappedY), height - 1);
         auto *row565 = output565 ? dst565 + y * buffer.stride : nullptr;
         auto *row8888 = output8888 ? dst8888 + y * buffer.stride * 4 : nullptr;
         for (int x = 0; x < buffer.width; ++x) {
-            const float mappedX = std::clamp((static_cast<float>(x) - offsetX) / scale, 0.0f,
-                                             static_cast<float>(width - 1));
-            const unsigned sourceX = static_cast<unsigned>(mappedX);
+            const float localX = static_cast<float>(x) - viewportLeft;
+            if (localX < 0.0f || localX >= viewportWidth) continue;
+            const float mappedX = (localX - offsetX) / scale;
+            if (mappedX < 0.0f || mappedX >= static_cast<float>(width)) continue;
+            const unsigned sourceX = std::min(static_cast<unsigned>(mappedX), width - 1);
             const uint8_t *p = source + sourceY * pitch;
             uint8_t r = 0, g = 0, b = 0;
             if (sourceFormat == RETRO_PIXEL_FORMAT_XRGB8888) {
