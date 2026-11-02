@@ -86,7 +86,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(8), dp(4), dp(8), dp(4))
-            setBackgroundColor(0x66000000)
+            setBackgroundColor(Color.TRANSPARENT)
         }
         addControl(topBar, "SELECT", SELECT, 76, 42)
         addControl(topBar, "START", START, 76, 42)
@@ -96,7 +96,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(18), dp(6), dp(18), dp(6))
-            setBackgroundColor(0x66000000)
+            setBackgroundColor(Color.TRANSPARENT)
         }
 
         // Croix directionnelle symétrique : les quatre directions ont exactement
