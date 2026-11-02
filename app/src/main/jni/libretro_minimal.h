@@ -100,6 +100,7 @@ void retro_set_audio_sample(retro_audio_sample_t);
 void retro_set_audio_sample_batch(retro_audio_sample_batch_t);
 void retro_set_input_poll(retro_input_poll_t);
 void retro_set_input_state(retro_input_state_t);
+void retro_set_controller_port_device(unsigned, unsigned);
 void retro_init(void);
 void retro_deinit(void);
 void retro_get_system_info(struct retro_system_info *);
