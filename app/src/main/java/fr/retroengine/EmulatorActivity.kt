@@ -151,6 +151,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     override fun surfaceCreated(holder: SurfaceHolder) {
         val error = nativeStart(holder.surface, romPath, filesDir.absolutePath, getExternalFilesDir(null)?.absolutePath ?: filesDir.absolutePath)
         if (error != null) {
+            nativeStop()
             status.text = error
             return
         }
@@ -237,7 +238,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         KeyEvent.KEYCODE_BUTTON_X -> X
         KeyEvent.KEYCODE_BUTTON_Y -> Y
         KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_ENTER -> START
-        KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_BACK -> SELECT
+        KeyEvent.KEYCODE_BUTTON_SELECT -> SELECT
         else -> 0
     }
 
