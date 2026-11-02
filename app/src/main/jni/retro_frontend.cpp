@@ -12,6 +12,9 @@
 #include <deque>
 #include <mutex>
 #include <string>
+#include <sys/stat.h>
+#include <sstream>
+#include <iomanip>
 #include <vector>
 #include "libretro_minimal.h"
 
@@ -35,11 +38,14 @@ struct CoreApi {
     decltype(&retro_load_game) load_game = nullptr;
     decltype(&retro_unload_game) unload_game = nullptr;
     decltype(&retro_run) run = nullptr;
+    decltype(&retro_get_memory_data) get_memory_data = nullptr;
+    decltype(&retro_get_memory_size) get_memory_size = nullptr;
 } core;
 
 ANativeWindow *window = nullptr;
 std::vector<uint8_t> romBytes;
 std::string currentRomPath;
+std::string currentSavePath;
 std::string systemDirectory;
 std::string saveDirectory;
 std::string lastError;
@@ -184,6 +190,49 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
     ANativeWindow_unlockAndPost(window);
 }
 
+std::string makeSavePath(const std::vector<uint8_t> &bytes) {
+    uint64_t hash = 14695981039346656037ull;
+    for (uint8_t byte : bytes) {
+        hash ^= byte;
+        hash *= 1099511628211ull;
+    }
+    std::ostringstream name;
+    name << saveDirectory << "/nes-" << std::hex << std::setw(16) << std::setfill('0') << hash << ".srm";
+    return name.str();
+}
+
+void loadSaveRam() {
+    if (!gameLoaded || !core.get_memory_data || !core.get_memory_size) return;
+    void *memory = core.get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    const size_t size = core.get_memory_size(RETRO_MEMORY_SAVE_RAM);
+    if (!memory || size == 0 || currentSavePath.empty()) return;
+    FILE *file = fopen(currentSavePath.c_str(), "rb");
+    if (!file) return;
+    const size_t read = fread(memory, 1, size, file);
+    fclose(file);
+    if (read != size) LOGE("SRAM existante incomplète : %zu/%zu octets", read, size);
+}
+
+void saveSaveRam() {
+    if (!gameLoaded || !core.get_memory_data || !core.get_memory_size || currentSavePath.empty()) return;
+    void *memory = core.get_memory_data(RETRO_MEMORY_SAVE_RAM);
+    const size_t size = core.get_memory_size(RETRO_MEMORY_SAVE_RAM);
+    if (!memory || size == 0) return;
+    const std::string temporary = currentSavePath + ".tmp";
+    FILE *file = fopen(temporary.c_str(), "wb");
+    if (!file) {
+        LOGE("Impossible d'ouvrir le fichier SRAM temporaire.");
+        return;
+    }
+    const size_t written = fwrite(memory, 1, size, file);
+    const bool flushed = fflush(file) == 0;
+    fclose(file);
+    if (written != size || !flushed || rename(temporary.c_str(), currentSavePath.c_str()) != 0) {
+        remove(temporary.c_str());
+        LOGE("Échec de l'écriture de la sauvegarde SRAM.");
+    }
+}
+
 bool openCore() {
     if (core.handle) return true;
     core.handle = dlopen("libnestopia_libretro.so", RTLD_NOW);
@@ -207,6 +256,8 @@ bool openCore() {
     LOAD(load_game);
     LOAD(unload_game);
     LOAD(run);
+    LOAD(get_memory_data);
+    LOAD(get_memory_size);
 #undef LOAD
     core.set_environment(environment);
     core.set_video_refresh(drawFrame);
@@ -282,6 +333,9 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
         return env->NewStringUTF(lastError.c_str());
     }
     gameLoaded = true;
+    mkdir(saveDirectory.c_str(), 0700);
+    currentSavePath = makeSavePath(romBytes);
+    loadSaveRam();
     core.set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
     {
         std::lock_guard<std::mutex> lock(audioMutex);
@@ -337,7 +391,13 @@ Java_fr_retroengine_EmulatorActivity_nativeGetFps(JNIEnv *, jobject) {
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_fr_retroengine_EmulatorActivity_nativeSaveRam(JNIEnv *, jobject) {
+    saveSaveRam();
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_fr_retroengine_EmulatorActivity_nativeStop(JNIEnv *, jobject) {
+    saveSaveRam();
     if (gameLoaded && core.unload_game) core.unload_game();
     gameLoaded = false;
     if (initialized && core.deinit) core.deinit();
@@ -348,6 +408,7 @@ Java_fr_retroengine_EmulatorActivity_nativeStop(JNIEnv *, jobject) {
     window = nullptr;
     romBytes.clear();
     currentRomPath.clear();
+    currentSavePath.clear();
     {
         std::lock_guard<std::mutex> lock(audioMutex);
         audioQueue.clear();
