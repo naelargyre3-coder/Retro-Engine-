@@ -37,7 +37,11 @@ GitHub Actions exécute les tests unitaires, compile Nestopia, compile le fronte
 - Pas encore de filtres graphiques.
 - Pas encore de moteurs intégrés pour les autres consoles.
 - Pas encore de signature de production ni de pipeline de publication.
-- Le logo officiel `retro_engine_logo.png` doit encore être intégré aux ressources de l'application ; il ne sera pas imposé aux jeux exportés.
+- Le logo officiel `retro_engine_logo.png` n'est pas encore intégré au dépôt. Le fichier source doit être importé avant de générer les ressources d'icône. Il s'agit uniquement de l'icône de Retro Engine ; les jeux exportés garderont leurs propres icônes personnalisables.
+
+## Suivi du développement
+
+Le journal des interventions, vérifications, changements réellement enregistrés et tâches bloquées est disponible dans [docs/PROJECT_LOG.md](docs/PROJECT_LOG.md).
 
 ## Licences
 
