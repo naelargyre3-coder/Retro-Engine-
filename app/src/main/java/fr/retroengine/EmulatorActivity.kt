@@ -280,6 +280,17 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         publishInputMask()
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val bit = keyMask(event.keyCode)
+        if (bit != 0) {
+            if (event.action == KeyEvent.ACTION_DOWN) pressedHardwareKeys.add(event.keyCode)
+            else if (event.action == KeyEvent.ACTION_UP) pressedHardwareKeys.remove(event.keyCode)
+            refreshHardwareInputMask()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyMask(keyCode) != 0) {
             pressedHardwareKeys.add(keyCode)
