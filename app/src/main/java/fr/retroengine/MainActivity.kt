@@ -17,6 +17,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 class MainActivity : ComponentActivity() {
     private lateinit var resultText: TextView
     private lateinit var statusText: TextView
+    private lateinit var coreText: TextView
     private val romPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) handleSelectedRom(uri)
     }
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity() {
         window.statusBarColor = 0xFF0B1018.toInt()
         window.navigationBarColor = 0xFF0B1018.toInt()
         buildScreen()
+        coreText.text = NestopiaCoreLoader.load().message
     }
 
     private fun buildScreen() {
@@ -44,6 +46,7 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(0xFF00D9FF.toInt())
             setOnClickListener { romPicker.launch(arrayOf("*/*")) }
         }
+        coreText = makeText("Vérification du moteur NES…", 14f, 0xFF9EADBF.toInt())
         statusText = makeText("En attente d'un fichier ROM.", 16f, 0xFFFFFFFF.toInt(), true)
         resultText = makeText(
             "Importe une ROM pour identifier sa console et afficher les informations du fichier.",
@@ -51,8 +54,8 @@ class MainActivity : ComponentActivity() {
         )
         val notice = makeText(
             "ÉTAT DE CETTE VERSION\nL'import local et la détection par extension sont disponibles. " +
-                "Les moteurs d'émulation et la génération d'APK de jeux seront ajoutés et testés dans les étapes suivantes. " +
-                "Aucun jeu n'est annoncé comme fonctionnel avant l'intégration de son moteur.",
+                "Le cœur natif NES est intégré, mais le frontend libretro Android n'est pas encore connecté. " +
+                "Aucun jeu ne peut donc être lancé pour le moment.",
             13f, 0xFFFFD58A.toInt()
         )
         page.addView(title)
@@ -60,7 +63,8 @@ class MainActivity : ComponentActivity() {
         page.addView(accent, LinearLayout.LayoutParams(-1, dp(3)).apply {
             topMargin = dp(22); bottomMargin = dp(22)
         })
-        page.addView(importButton, LinearLayout.LayoutParams(-1, dp(54)))
+        page.addView(coreText, margin(0))
+        page.addView(importButton, margin(20).apply { height = dp(54) })
         page.addView(statusText, margin(26))
         page.addView(resultText, margin(10))
         page.addView(notice, margin(34))
@@ -89,7 +93,7 @@ class MainActivity : ComponentActivity() {
                 if (nesInfo.prgRomBytes != null) append("\nPRG-ROM : ").append(nesInfo.prgRomBytes).append(" octets")
                 if (nesInfo.chrRomBytes != null) append("\nCHR-ROM : ").append(nesInfo.chrRomBytes).append(" octets")
                 append("\nFormat : ").append(nesInfo.format)
-                append("\n\nLe moteur NES n'est pas encore intégré : cette analyse ne lance pas le jeu.")
+                append("\n\nLe cœur NES est chargé séparément ; le frontend nécessaire au lancement n'est pas encore disponible.")
             } else if (console == ConsoleType.UNKNOWN) {
                 append("\n\nCe format n'est pas reconnu par la détection actuelle.")
             } else {
