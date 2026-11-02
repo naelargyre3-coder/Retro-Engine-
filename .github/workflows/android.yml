@@ -57,24 +57,42 @@ jobs:
           mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/assets/licenses
           cp .build/libs/arm64-v8a/libretro.so app/src/main/jniLibs/arm64-v8a/libnestopia_libretro.so
           cp .build/nestopia/COPYING app/src/main/assets/licenses/Nestopia-COPYING.txt
-          printf '%s\n' 'f1e02d12664834536edbf7352995a3d0cd1caef4' > app/src/main/assets/licenses/Nestopia-source-revision.txt
+          printf '%s\\n' 'f1e02d12664834536edbf7352995a3d0cd1caef4' > app/src/main/assets/licenses/Nestopia-source-revision.txt
           tar -czf .build/nestopia-source.tar.gz -C .build nestopia
+
+      - name: Build Android libretro frontend (arm64-v8a)
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          "$NDK/ndk-build" \
+            NDK_PROJECT_PATH="$GITHUB_WORKSPACE/app/src/main/jni" \
+            APP_BUILD_SCRIPT="$GITHUB_WORKSPACE/app/src/main/jni/Android.mk" \
+            NDK_APPLICATION_MK="$GITHUB_WORKSPACE/app/src/main/jni/Application.mk" \
+            APP_ABI=arm64-v8a \
+            APP_PLATFORM=android-23 \
+            NDK_OUT="$GITHUB_WORKSPACE/.build/frontend-obj" \
+            NDK_LIBS_OUT="$GITHUB_WORKSPACE/.build/frontend-libs"
+          cp .build/frontend-libs/arm64-v8a/libretro_frontend.so app/src/main/jniLibs/arm64-v8a/libretro_frontend.so
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify packaged Nestopia library
+      - name: Verify packaged native libraries and licenses
         run: |
           set -euo pipefail
-          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libnestopia_libretro.so|assets/licenses/Nestopia-COPYING.txt'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libnestopia_libretro.so'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libretro_frontend.so'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'assets/licenses/Nestopia-COPYING.txt'
 
-      - name: Upload APK, core and corresponding source
+      - name: Upload APK, cores and corresponding source
         uses: actions/upload-artifact@v4
         with:
-          name: retro-engine-debug-apk-with-nestopia
+          name: retro-engine-nes-frontend-debug-apk
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/src/main/jniLibs/arm64-v8a/libnestopia_libretro.so
+            app/src/main/jniLibs/arm64-v8a/libretro_frontend.so
             .build/nestopia-source.tar.gz
             app/src/main/assets/licenses/Nestopia-COPYING.txt
             app/src/main/assets/licenses/Nestopia-source-revision.txt
