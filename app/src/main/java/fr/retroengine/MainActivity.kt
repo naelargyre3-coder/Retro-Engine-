@@ -1,6 +1,6 @@
 package fr.retroengine
 
-import android.app.Activity
+import androidx.activity.ComponentActivity
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
@@ -14,7 +14,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
     private lateinit var resultText: TextView
     private lateinit var statusText: TextView
     private val romPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
