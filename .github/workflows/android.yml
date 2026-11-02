@@ -74,6 +74,7 @@ jobs:
             NDK_OUT="$GITHUB_WORKSPACE/.build/frontend-obj" \
             NDK_LIBS_OUT="$GITHUB_WORKSPACE/.build/frontend-libs"
           cp .build/frontend-libs/arm64-v8a/libretro_frontend.so app/src/main/jniLibs/arm64-v8a/libretro_frontend.so
+          cp .build/frontend-libs/arm64-v8a/libc++_shared.so app/src/main/jniLibs/arm64-v8a/libc++_shared.so
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
@@ -83,6 +84,7 @@ jobs:
           set -euo pipefail
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libnestopia_libretro.so'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libretro_frontend.so'
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libc\+\+_shared.so'
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'assets/licenses/Nestopia-COPYING.txt'
 
       - name: Upload APK, cores and corresponding source
@@ -93,6 +95,7 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk
             app/src/main/jniLibs/arm64-v8a/libnestopia_libretro.so
             app/src/main/jniLibs/arm64-v8a/libretro_frontend.so
+            app/src/main/jniLibs/arm64-v8a/libc++_shared.so
             .build/nestopia-source.tar.gz
             app/src/main/assets/licenses/Nestopia-COPYING.txt
             app/src/main/assets/licenses/Nestopia-source-revision.txt
