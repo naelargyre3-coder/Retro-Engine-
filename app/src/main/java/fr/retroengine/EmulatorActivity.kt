@@ -90,6 +90,9 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             setBackgroundColor(0x99000000.toInt())
         }
         topBar.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
+        // Commandes système NES placées dans la barre supérieure, comme sur la manette d'origine.
+        addControl(topBar, "SELECT", SELECT)
+        addControl(topBar, "START", START)
         val saveStateButton = Button(this).apply {
             text = "SAUVER"
             textSize = 10f
@@ -122,23 +125,10 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         controls.addView(dpad)
         val spacer = View(this)
         controls.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
-        val system = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
-        val systemRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        addControl(systemRow, "SELECT", SELECT)
-        addControl(systemRow, "START", START)
-        system.addView(systemRow)
-        controls.addView(system)
-        val spacer2 = View(this)
-        controls.addView(spacer2, LinearLayout.LayoutParams(0, 1, 1f))
-        val buttons = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER }
-        val buttonTop = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        val buttonBottom = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        addControl(buttonTop, "Y", Y)
-        addControl(buttonTop, "X", X)
-        addControl(buttonBottom, "B", B)
-        addControl(buttonBottom, "A", A)
-        buttons.addView(buttonTop)
-        buttons.addView(buttonBottom)
+        // La NES ne possède que deux boutons d'action : B et A.
+        val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        addControl(buttons, "B", B)
+        addControl(buttons, "A", A)
         controls.addView(buttons)
         root.addView(controls, FrameLayout.LayoutParams(-1, dp(116), Gravity.BOTTOM))
         setContentView(root)
