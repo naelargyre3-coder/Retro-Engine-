@@ -257,6 +257,8 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     override fun onPause() {
+        currentInputMask = 0
+        if (nativeStarted) nativeSetInputMask(0)
         stopLoop()
         if (nativeStarted) nativeSaveRam()
         super.onPause()
