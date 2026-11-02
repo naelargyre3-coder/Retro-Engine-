@@ -195,13 +195,13 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
         return;
     }
 
+    // Léger zoom centré pour réduire les bandes noires sans étirer l'image.
+    // Le facteur 1.08 agrandit l'image de 8 % et recadre symétriquement les bords.
     const float scale = std::min(
         static_cast<float>(buffer.width) / static_cast<float>(width),
-        static_cast<float>(buffer.height) / static_cast<float>(height));
-    const int drawWidth = std::max(1, static_cast<int>(width * scale));
-    const int drawHeight = std::max(1, static_cast<int>(height * scale));
-    const int offsetX = (buffer.width - drawWidth) / 2;
-    const int offsetY = (buffer.height - drawHeight) / 2;
+        static_cast<float>(buffer.height) / static_cast<float>(height)) * 1.08f;
+    const float offsetX = (static_cast<float>(buffer.width) - width * scale) / 2.0f;
+    const float offsetY = (static_cast<float>(buffer.height) - height * scale) / 2.0f;
 
     auto *dst565 = output565 ? static_cast<uint16_t *>(buffer.bits) : nullptr;
     auto *dst8888 = output8888 ? static_cast<uint8_t *>(buffer.bits) : nullptr;
@@ -217,12 +217,16 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
     }
 
     const auto *source = static_cast<const uint8_t *>(data);
-    for (int y = 0; y < drawHeight; ++y) {
-        const unsigned sourceY = std::min(height - 1, static_cast<unsigned>(y / scale));
-        auto *row565 = output565 ? dst565 + (offsetY + y) * buffer.stride : nullptr;
-        auto *row8888 = output8888 ? dst8888 + (offsetY + y) * buffer.stride * 4 : nullptr;
-        for (int x = 0; x < drawWidth; ++x) {
-            const unsigned sourceX = std::min(width - 1, static_cast<unsigned>(x / scale));
+    for (int y = 0; y < buffer.height; ++y) {
+        const float mappedY = std::clamp((static_cast<float>(y) - offsetY) / scale, 0.0f,
+                                         static_cast<float>(height - 1));
+        const unsigned sourceY = static_cast<unsigned>(mappedY);
+        auto *row565 = output565 ? dst565 + y * buffer.stride : nullptr;
+        auto *row8888 = output8888 ? dst8888 + y * buffer.stride * 4 : nullptr;
+        for (int x = 0; x < buffer.width; ++x) {
+            const float mappedX = std::clamp((static_cast<float>(x) - offsetX) / scale, 0.0f,
+                                             static_cast<float>(width - 1));
+            const unsigned sourceX = static_cast<unsigned>(mappedX);
             const uint8_t *p = source + sourceY * pitch;
             uint8_t r = 0, g = 0, b = 0;
             if (sourceFormat == RETRO_PIXEL_FORMAT_XRGB8888) {
@@ -248,9 +252,9 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
             }
 
             if (output565) {
-                row565[offsetX + x] = static_cast<uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+                row565[x] = static_cast<uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
             } else {
-                uint8_t *pixel = row8888 + (offsetX + x) * 4;
+                uint8_t *pixel = row8888 + x * 4;
                 pixel[0] = r;
                 pixel[1] = g;
                 pixel[2] = b;
