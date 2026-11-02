@@ -44,7 +44,12 @@ class MainActivity : ComponentActivity() {
             setPadding(dp(22), dp(26), dp(22), dp(26))
             setBackgroundColor(0xFF0B1018.toInt())
         }
-        val scroll = ScrollView(this).apply { addView(page) }
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(0xFF0B1018.toInt())
+            isFillViewport = true
+            clipToPadding = false
+            addView(page)
+        }
         val title = makeText("RETRO ENGINE", 30f, 0xFFFFFFFF.toInt(), true)
         val subtitle = makeText("Atelier de création de jeux Android", 15f, 0xFF9EADBF.toInt())
         val accent = View(this).apply { setBackgroundColor(0xFF00D9FF.toInt()) }
@@ -83,6 +88,13 @@ class MainActivity : ComponentActivity() {
         page.addView(statusText, margin(26))
         page.addView(resultText, margin(10))
         page.addView(notice, margin(34))
+        val flexibleSpace = View(this)
+        page.addView(flexibleSpace, LinearLayout.LayoutParams(-1, 0, 1f))
+        val footer = makeText("RETRO ENGINE  •  VERSION EXPÉRIMENTALE", 11f, 0xFF657386.toInt()).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(18), 0, dp(4))
+        }
+        page.addView(footer, LinearLayout.LayoutParams(-1, -2))
         setContentView(scroll)
     }
 
