@@ -75,17 +75,41 @@ class MainActivity : ComponentActivity() {
         }
         val details = queryFile(uri)
         val console = ConsoleDetector.detect(details.first)
-        statusText.text = "FICHIER IMPORTÉ"
+        val nesInfo = if (console == ConsoleType.NES) {
+            NesRomInspector.inspect(readHeader(uri), details.second)
+        } else null
+        statusText.text = if (nesInfo?.isAccepted == false) "ROM NES À VÉRIFIER" else "FICHIER IMPORTÉ"
         resultText.text = buildString {
             append("Nom : ").append(details.first)
             append("\nTaille : ").append(if (details.second >= 0) details.second.toString() + " octets" else "indisponible")
             append("\nConsole détectée : ").append(console.displayName)
-            if (console == ConsoleType.UNKNOWN) {
+            if (nesInfo != null) {
+                append("\n\nAnalyse NES : ").append(nesInfo.message)
+                if (nesInfo.mapper != null) append("\nMapper : ").append(nesInfo.mapper)
+                if (nesInfo.prgRomBytes != null) append("\nPRG-ROM : ").append(nesInfo.prgRomBytes).append(" octets")
+                if (nesInfo.chrRomBytes != null) append("\nCHR-ROM : ").append(nesInfo.chrRomBytes).append(" octets")
+                append("\nFormat : ").append(nesInfo.format)
+                append("\n\nLe moteur NES n'est pas encore intégré : cette analyse ne lance pas le jeu.")
+            } else if (console == ConsoleType.UNKNOWN) {
                 append("\n\nCe format n'est pas reconnu par la détection actuelle.")
             } else {
                 append("\n\nLe fichier est identifié. Le lancement sera disponible lorsque le moteur de cette console sera intégré.")
             }
         }
+    }
+
+    private fun readHeader(uri: Uri): ByteArray {
+        val header = ByteArray(16)
+        contentResolver.openInputStream(uri)?.use { input ->
+            var offset = 0
+            while (offset < header.size) {
+                val count = input.read(header, offset, header.size - offset)
+                if (count <= 0) break
+                offset += count
+            }
+            if (offset < header.size) return header.copyOf(offset)
+        }
+        return header
     }
 
     private fun queryFile(uri: Uri): Pair<String, Long> {
