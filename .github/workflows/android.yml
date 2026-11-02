@@ -12,29 +12,71 @@ jobs:
     name: Test and build APK
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Retro Engine
         uses: actions/checkout@v4
+
+      - name: Checkout pinned Nestopia source
+        uses: actions/checkout@v4
+        with:
+          repository: libretro/nestopia
+          ref: f1e02d12664834536bfed7352995a3d0cd1caef4
+          path: .build/nestopia
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-      - name: Set up Android SDK
+
+      - name: Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-36 build-tools;36.0.0
+          packages: platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.13"
+
       - name: Run unit tests
         run: gradle --no-daemon testDebugUnitTest
+
+      - name: Build Nestopia native core (arm64-v8a)
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          "$NDK/ndk-build" \
+            NDK_PROJECT_PATH="$GITHUB_WORKSPACE/.build/nestopia/libretro/jni" \
+            APP_BUILD_SCRIPT="$GITHUB_WORKSPACE/.build/nestopia/libretro/jni/Android.mk" \
+            NDK_APPLICATION_MK="$GITHUB_WORKSPACE/.build/nestopia/libretro/jni/Application.mk" \
+            APP_ABI=arm64-v8a \
+            APP_PLATFORM=android-23 \
+            NDK_OUT="$GITHUB_WORKSPACE/.build/obj" \
+            NDK_LIBS_OUT="$GITHUB_WORKSPACE/.build/libs"
+          mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/assets/licenses
+          cp .build/libs/arm64-v8a/libretro.so app/src/main/jniLibs/arm64-v8a/libnestopia_libretro.so
+          cp .build/nestopia/COPYING app/src/main/assets/licenses/Nestopia-COPYING.txt
+          printf '%s\n' 'f1e02d12664834536bfed7352995a3d0cd1caef4' > app/src/main/assets/licenses/Nestopia-source-revision.txt
+          tar -czf .build/nestopia-source.tar.gz -C .build nestopia
+
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
-      - name: Upload APK artifact
+
+      - name: Verify packaged Nestopia library
+        run: |
+          set -euo pipefail
+          unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -E 'lib/arm64-v8a/libnestopia_libretro.so|assets/licenses/Nestopia-COPYING.txt'
+
+      - name: Upload APK, core and corresponding source
         uses: actions/upload-artifact@v4
         with:
-          name: retro-engine-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: retro-engine-debug-apk-with-nestopia
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/src/main/jniLibs/arm64-v8a/libnestopia_libretro.so
+            .build/nestopia-source.tar.gz
+            app/src/main/assets/licenses/Nestopia-COPYING.txt
+            app/src/main/assets/licenses/Nestopia-source-revision.txt
           if-no-files-found: error
           retention-days: 14
