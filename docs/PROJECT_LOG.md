@@ -440,3 +440,24 @@ Ajouter un vrai réglage sélectionnable depuis le menu et corriger l'image NES 
 - Modification enregistrée sur la branche `v2.3-touch-controls`.
 - La compilation CI et l'assemblage de l'APK restent à vérifier.
 - Aucun test visuel sur téléphone n'a encore été réalisé ; il faudra confirmer que les bandes sombres ont disparu sans gêner la visibilité des boutons.
+
+
+## 2026-11-02 — Retour au cadre 16:9 centré
+
+### Clarification utilisateur
+- L'utilisateur ne souhaite pas que l'image remplisse tout l'écran.
+- Il souhaite un cadre de jeu 16:9, centré, avec l'image complète et sans déformation.
+
+### Fichier modifié
+- `app/src/main/jni/retro_frontend.cpp`
+
+### Modification
+- Le mode 16:9 calcule désormais un rectangle 16:9 centré dans la surface Android.
+- L'image NES au rapport de présentation 4:3 est ajustée en mode « contain » à l'intérieur de ce cadre.
+- Aucun recadrage ni étirement ; les espaces autour de l'image et à l'extérieur du cadre restent noirs.
+- Le mode 4:3 conserve son ajustement avec l'image entière.
+
+### Vérification et limites
+- Modification enregistrée sur la branche `v2.3-touch-controls`.
+- Compilation CI, assemblage APK et contrôle visuel sur téléphone à effectuer.
+- Aucun résultat de test sur appareil n'est revendiqué.
