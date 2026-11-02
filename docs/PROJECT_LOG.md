@@ -366,3 +366,29 @@ Le rendu 16:9 précédent recadrait l'image (mise à l'échelle « cover »), ce
 - Compilation CI à vérifier après ce commit.
 - Test visuel sur téléphone requis pour confirmer le cadrage réel.
 - Le réglage interactif 4:3/16:9 et les modes portrait/paysage/automatique ne sont pas encore implémentés.
+
+
+## 2026-11-02 — Ajout du choix de ratio 4:3 / 16:9 et correction du rapport de pixels NES
+
+### Objectif
+Ajouter un vrai réglage sélectionnable depuis le menu et corriger l'image NES trop étroite observée sur la capture utilisateur.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/MainActivity.kt`
+- `app/src/main/java/fr/retroengine/EmulatorActivity.kt`
+- `app/src/main/jni/retro_frontend.cpp`
+- `docs/PROJECT_LOG.md`
+
+### Modifications
+- Ajout dans le menu d'un choix radio **4:3 / 16:9**, mémorisé localement dans les préférences de l'application (valeur initiale : 16:9).
+- Transmission du choix à l'activité d'émulation puis au frontend natif JNI au démarrage du jeu.
+- Calcul du viewport natif en fonction du choix 4:3 ou 16:9, au lieu d'imposer 16:9 sans réglage.
+- Correction du rapport de pixels NES : une image source typique de 256×240 est affichée au rapport de présentation 4:3, au lieu d'être traitée comme une image carrée/1,067:1.
+- En mode 16:9, l'image NES 4:3 complète reste centrée dans le viewport 16:9 ; les zones restantes sont noires. Aucun recadrage, zoom ou étirement n'est appliqué à l'image du jeu.
+
+### Vérification et limites
+- Modifications enregistrées sur la branche `v2.3-touch-controls`.
+- La compilation Android et native doit être confirmée par le workflow CI ; elle n'est pas déclarée réussie à ce stade.
+- Aucun test visuel sur téléphone n'a encore été effectué après cette modification.
+- Sur un écran physique 20:9, des marges peuvent subsister autour du viewport 16:9 ; elles sont attendues pour conserver le ratio sélectionné. Le choix 4:3 utilise un viewport plus étroit adapté au format classique des jeux NES.
+- Le choix du ratio est appliqué au lancement du jeu ; pour changer le format, revenir au menu, sélectionner l'autre ratio et relancer le jeu.
