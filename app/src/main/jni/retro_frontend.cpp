@@ -35,7 +35,7 @@ struct CoreApi {
     decltype(&retro_init) init = nullptr;
     decltype(&retro_deinit) deinit = nullptr;
     decltype(&retro_get_system_info) get_system_info = nullptr;
-    decltype(&retro_get_system_av_info) get_av_info = nullptr;
+    decltype(&retro_get_system_av_info) get_system_av_info = nullptr;
     decltype(&retro_load_game) load_game = nullptr;
     decltype(&retro_unload_game) unload_game = nullptr;
     decltype(&retro_run) run = nullptr;
@@ -370,7 +370,7 @@ bool openCore() {
     LOAD(init);
     LOAD(deinit);
     LOAD(get_system_info);
-    LOAD(get_av_info);
+    LOAD(get_system_av_info);
     LOAD(load_game);
     LOAD(unload_game);
     LOAD(run);
@@ -396,7 +396,7 @@ bool openCore() {
         return false;
     }
     retro_system_av_info av{};
-    core.get_av_info(&av);
+    core.get_system_av_info(&av);
     if (av.timing.fps > 1.0 && av.timing.fps < 240.0) fps = av.timing.fps;
     if (av.timing.sample_rate > 8000.0 && av.timing.sample_rate < 192000.0) sampleRate = av.timing.sample_rate;
     return true;

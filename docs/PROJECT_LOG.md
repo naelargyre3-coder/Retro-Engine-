@@ -171,3 +171,26 @@ Rendre le diagnostic de l'écran noir exploitable directement depuis le téléph
 
 ### Étape suivante
 Installer l'APK CI sur le téléphone, lancer une ROM NES et relever les compteurs affichés dans la barre supérieure avant de poursuivre les ajustements des manettes des autres consoles.
+
+
+## 2026-11-02 — Correction du nom du symbole AV libretro
+
+### Retour utilisateur
+- Le téléphone affiche : « Symbole libretro manquant : retro_get_av_info ».
+
+### Cause identifiée
+- Le chargeur JNI construisait le nom exporté à partir de `LOAD(get_av_info)`, ce qui recherchait littéralement `retro_get_av_info`.
+- L'API libretro déclare et exporte `retro_get_system_av_info`. Le nom abrégé utilisé par le frontend ne correspondait donc pas au symbole du cœur Nestopia.
+
+### Fichiers modifiés
+- `app/src/main/jni/retro_frontend.cpp`
+- `docs/PROJECT_LOG.md`
+
+### Correction
+- Renommage du pointeur de fonction interne en `get_system_av_info`.
+- Le chargeur recherche désormais `retro_get_system_av_info`, puis appelle cette fonction pour lire la fréquence vidéo et audio.
+
+### Vérification et limites
+- La correction du nom est enregistrée dans le code source ; elle ne prouve pas encore que le cœur se lance sur le téléphone.
+- Le workflow CI doit confirmer la compilation native et l'assemblage APK.
+- Après installation, vérifier que le message « symbole libretro manquant » a disparu, puis confirmer l'affichage et le son d'une ROM NES.
