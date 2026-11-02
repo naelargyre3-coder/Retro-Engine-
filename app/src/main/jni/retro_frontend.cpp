@@ -20,6 +20,7 @@
 
 #define LOG_TAG "RetroEngine"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
 namespace {
 struct CoreApi {
@@ -57,6 +58,9 @@ std::mutex audioMutex;
 std::deque<int16_t> audioQueue;
 std::atomic<int> inputMask{0};
 std::atomic<int> pixelFormat{RETRO_PIXEL_FORMAT_RGB565};
+std::atomic<unsigned> videoCallbackCount{0};
+std::atomic<unsigned> frameRunCount{0};
+std::atomic<unsigned> windowLockFailures{0};
 double fps = 60.0;
 double sampleRate = 32040.0;
 bool initialized = false;
@@ -144,11 +148,18 @@ size_t audioBatch(const int16_t *data, size_t frames) {
 }
 
 void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) {
+    const unsigned callbackNumber = videoCallbackCount.fetch_add(1) + 1;
+    if (callbackNumber <= 5) LOGI("Video callback #%u: data=%p, %ux%u, pitch=%zu, format=%d", callbackNumber, data, width, height, pitch, pixelFormat.load());
     if (!data || width == 0 || height == 0) return;
     std::lock_guard<std::mutex> windowLock(windowMutex);
     if (!window) return;
     ANativeWindow_Buffer buffer{};
-    if (ANativeWindow_lock(window, &buffer, nullptr) != 0) return;
+    if (ANativeWindow_lock(window, &buffer, nullptr) != 0) {
+        const unsigned failure = windowLockFailures.fetch_add(1) + 1;
+        if (failure <= 5) LOGE("ANativeWindow_lock a échoué (tentative %u).", failure);
+        return;
+    }
+    if (callbackNumber == 1) LOGI("Surface native: %dx%d, stride=%d, format=%d", buffer.width, buffer.height, buffer.stride, buffer.format);
 
     const float scale = std::min(
         static_cast<float>(buffer.width) / static_cast<float>(width),
@@ -338,6 +349,10 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject surface,
                                                   jstring romPath, jstring systemDir, jstring saveDir) {
     lastError.clear();
+    LOGI("nativeStart appelé : initialisation du moteur NES.");
+    videoCallbackCount.store(0);
+    frameRunCount.store(0);
+    windowLockFailures.store(0);
     const char *sys = env->GetStringUTFChars(systemDir, nullptr);
     const char *save = env->GetStringUTFChars(saveDir, nullptr);
     systemDirectory = sys ? sys : "";
@@ -377,7 +392,10 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
     env->ReleaseStringUTFChars(romPath, path);
     if (read != romBytes.size()) return env->NewStringUTF("Lecture incomplète de la ROM.");
 
-    if (!openCore()) return env->NewStringUTF(lastError.c_str());
+    if (!openCore()) {
+        LOGE("Échec openCore: %s", lastError.c_str());
+        return env->NewStringUTF(lastError.c_str());
+    }
     retro_system_info systemInfo{};
     core.get_system_info(&systemInfo);
     retro_game_info game{};
@@ -386,8 +404,10 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
     game.size = systemInfo.need_fullpath ? 0 : romBytes.size();
     if (!core.load_game(&game)) {
         lastError = "Nestopia a refusé cette ROM. Vérifie son format et son intégrité.";
+        LOGE("Échec du chargement de la ROM par Nestopia.");
         return env->NewStringUTF(lastError.c_str());
     }
+    LOGI("ROM chargée par Nestopia; démarrage des images.");
     gameLoaded = true;
     mkdir(saveDirectory.c_str(), 0700);
     currentSavePath = makeSavePath(romBytes);
@@ -411,6 +431,8 @@ Java_fr_retroengine_EmulatorActivity_nativeSetSurface(JNIEnv *env, jobject, jobj
 
 extern "C" JNIEXPORT void JNICALL
 Java_fr_retroengine_EmulatorActivity_nativeRunFrame(JNIEnv *, jobject) {
+    const unsigned number = frameRunCount.fetch_add(1) + 1;
+    if (number <= 5) LOGI("nativeRunFrame #%u : gameLoaded=%d, core.run=%p", number, gameLoaded ? 1 : 0, reinterpret_cast<void *>(core.run));
     if (gameLoaded && core.run) core.run();
 }
 

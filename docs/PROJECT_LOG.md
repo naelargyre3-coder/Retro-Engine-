@@ -124,3 +124,24 @@ Sécuriser l'accès à la fenêtre Android native lorsque le thread d'émulation
 - Le nouveau workflow doit vérifier cette modification d'interface.
 - Aucun test visuel sur téléphone n'a encore été effectué.
 - Le problème d'écran noir n'est pas déclaré résolu ; le correctif de synchronisation de surface est compilé, mais seul un essai sur appareil permettra de confirmer le rendu réel.
+
+
+## 2026-11-02 — Instrumentation du rendu vidéo NES
+
+### Objectif
+Identifier la cause de l'écran noir persistant sans présenter une hypothèse comme une correction confirmée.
+
+### Fichiers modifiés
+- `app/src/main/jni/retro_frontend.cpp`
+- `docs/PROJECT_LOG.md`
+
+### Modifications
+- Ajout de journaux limités aux cinq premiers appels de la boucle d'émulation et du callback vidéo.
+- Enregistrement des dimensions de l'image, du pitch, du format de pixels et du format/dimensions de la surface Android.
+- Journalisation des échecs de verrouillage de la fenêtre native.
+- Journalisation des étapes d'initialisation du cœur et du chargement de la ROM.
+
+### Vérification et limites
+- Le code est enregistré sur `main`; le workflow de ce commit doit encore confirmer compilation et assemblage APK.
+- Aucun essai sur téléphone ni journal Logcat de l'appareil n'est disponible à cette étape.
+- L'écran noir reste non résolu. Les traces doivent permettre de distinguer absence de callback vidéo, boucle inactive et échec de publication de la surface.
