@@ -17,23 +17,20 @@ Retro Engine est un atelier Android destiné à préparer des applications de je
 
 ## État actuel
 
-**Phase 0 — socle Android :** projet Gradle, activité Android, import local par sélecteur de fichiers, détection des consoles par extension et tests unitaires.
+**Socle Android :** projet Gradle, activité Android, import local par sélecteur de fichiers, détection des consoles par extension et tests unitaires.
 
-**Pas encore inclus :** cœurs d'émulation, exécution des jeux, options graphiques avancées, profils de manettes, génération et signature d'APK autonomes par ROM et historique. Ces fonctions seront intégrées par étapes et ne seront pas simulées.
+**Première étape NES :** inspection de l'en-tête iNES, détection iNES / NES 2.0, lecture du mapper et des tailles PRG-ROM / CHR-ROM. Le décodage avancé des tailles NES 2.0 reste à compléter.
 
-L'image officielle retro_engine_logo.png doit être ajoutée aux ressources Android dès que le fichier binaire peut être transféré dans le dépôt. Elle ne sera pas utilisée comme icône des jeux exportés.
+**Intégration native en cours :** le workflow compile le cœur Nestopia libretro pour Android arm64-v8a depuis une révision source figée, puis le place dans l'APK avec sa notice GPL. Le binaire natif est ainsi construit et empaqueté ; il n'est pas encore relié à un frontend Android et ne lance donc pas encore de jeu.
+
+Révision Nestopia utilisée : `f1e02d12664834536bfed7352995a3d0cd1caef4` du dépôt [libretro/nestopia](https://github.com/libretro/nestopia). Le cœur est sous licence GPL-2.0-or-later ; la notice de licence est intégrée à l'APK et l'archive de la source correspondante est publiée avec l'artefact de compilation.
 
 ## Compilation
 
-Le workflow GitHub Actions exécute les tests et produit app/build/outputs/apk/debug/app-debug.apk. L'APK est publié comme artefact de workflow après une exécution réussie.
+Le workflow GitHub Actions exécute les tests, compile le cœur natif Nestopia, construit l'APK debug et vérifie que la bibliothèque native ainsi que sa notice de licence sont présentes dans l'APK. Les artefacts comprennent l'APK, la bibliothèque native et l'archive de la source correspondante.
 
+## Fonctions non encore disponibles
 
-## Première étape NES
+L'exécution des jeux dans l'application, l'interface frontend libretro, les options graphiques avancées, les profils de manettes, la génération et la signature d'APK autonomes par ROM et l'historique restent à intégrer et à tester. Ces fonctions ne sont pas simulées.
 
-L'import des fichiers .nes effectue maintenant une inspection de l'en-tête iNES :
-- signature du fichier et présence des 16 octets d'en-tête ;
-- identification iNES / NES 2.0 ;
-- lecture du mapper et des tailles PRG-ROM / CHR-ROM ;
-- vérification de la taille minimale pour iNES classique, avec prise en compte du trainer.
-
-Limites actuelles : le décodage avancé des tailles NES 2.0 reste à compléter. Cette inspection ne lance pas de jeu. Le cœur d'émulation Nestopia (GPL-2.0) est à intégrer dans une étape distincte, avec ses obligations de licence et de fourniture du code source correspondant.
+L'image officielle `retro_engine_logo.png` doit encore être ajoutée aux ressources Android dès que le fichier binaire peut être transféré dans le dépôt. Elle ne sera pas utilisée comme icône des jeux exportés.
