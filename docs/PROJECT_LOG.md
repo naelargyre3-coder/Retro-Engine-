@@ -54,3 +54,25 @@ Ces éléments restent expérimentaux tant qu'ils ne sont pas validés sur un ap
 3. résultat attendu et résultat réellement obtenu ;
 4. tests exécutés (ou raison pour laquelle ils ne l'ont pas été) ;
 5. limites et prochaines étapes.
+
+
+## 2026-11-02 — Première correction de l'interface de commandes NES
+
+### Objectif
+Appliquer le retour utilisateur sur la manette tactile : une disposition propre à la NES, sans boutons X/Y visibles, avec START et SELECT dans la barre supérieure.
+
+### Fichier modifié
+- `app/src/main/java/fr/retroengine/EmulatorActivity.kt`
+
+### Modifications effectuées
+- Déplacement des commandes tactiles `SELECT` et `START` dans la barre supérieure, à côté du statut et des commandes de sauvegarde.
+- Suppression des boutons tactiles `X` et `Y` de l'écran NES.
+- Conservation des deux boutons d'action NES `B` et `A` dans la zone inférieure droite.
+- Conservation de la croix directionnelle dans la zone inférieure gauche.
+- Les bits d'entrée et le mappage des événements de manette physique n'ont pas été modifiés.
+
+### Vérification et limites
+- Modification enregistrée sur `main` dans le commit `8d70c20d84778e076aa9d31180e1c900d636d110`.
+- Le workflow Android déclenché par ce commit doit encore confirmer la compilation et les tests.
+- Aucun test visuel ni test de manipulation sur téléphone n'a été effectué ici.
+- Cette modification ne corrige pas encore le problème signalé précédemment concernant l'image du jeu qui ne s'affiche pas ; ce problème nécessite un diagnostic distinct sur appareil avec des journaux d'exécution.
