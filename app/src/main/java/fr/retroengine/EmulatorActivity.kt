@@ -54,6 +54,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private external fun nativeDrainAudio(output: ShortArray): Int
     private external fun nativeGetSampleRate(): Double
     private external fun nativeGetFps(): Double
+    private external fun nativeSaveRam()
     private external fun nativeStop()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -149,7 +150,8 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
-        val error = nativeStart(holder.surface, romPath, filesDir.absolutePath, getExternalFilesDir(null)?.absolutePath ?: filesDir.absolutePath)
+        val saveDirectory = java.io.File(filesDir, "saves").apply { mkdirs() }
+        val error = nativeStart(holder.surface, romPath, filesDir.absolutePath, saveDirectory.absolutePath)
         if (error != null) {
             nativeStop()
             status.text = error
@@ -252,6 +254,11 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         val bit = keyMask(keyCode)
         if (bit != 0) { updateInput(bit, false); return true }
         return super.onKeyUp(keyCode, event)
+    }
+
+    override fun onPause() {
+        if (nativeStarted) nativeSaveRam()
+        super.onPause()
     }
 
     override fun onDestroy() {
