@@ -13,7 +13,6 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -53,10 +52,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private external fun nativeDrainAudio(output: ShortArray): Int
     private external fun nativeGetSampleRate(): Double
     private external fun nativeGetFps(): Double
-    private external fun nativeGetVideoDiagnostics(): String
     private external fun nativeSaveRam()
-    private external fun nativeSaveState(): String?
-    private external fun nativeLoadState(): String?
     private external fun nativeStop()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -176,11 +172,10 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         val error = nativeStart(holder.surface, romPath, filesDir.absolutePath, saveDirectory.absolutePath)
         if (error != null) {
             nativeStop()
-            status.text = error
+            android.util.Log.e("RetroEngine", error)
             return
         }
         nativeStarted = true
-        status.text = "Nestopia actif · NES"
         startAudioAndLoop()
     }
 
@@ -195,14 +190,6 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             nativeStop()
             nativeStarted = false
         }
-    }
-
-    private fun performStateAction(successMessage: String, action: () -> String?) {
-        if (!nativeStarted) return
-        stopLoop()
-        val error = action()
-        status.text = error ?: successMessage
-        startAudioAndLoop()
     }
 
     private fun startAudioAndLoop() {
@@ -229,18 +216,9 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         renderThread = Thread({
             val samples = ShortArray(4096)
             var nextFrame = System.nanoTime()
-            var diagnosticFrames = 0
             while (running.get()) {
                 nativeSetInputMask(currentInputMask)
                 nativeRunFrame()
-                diagnosticFrames++
-                if (diagnosticFrames >= 60) {
-                    diagnosticFrames = 0
-                    val diagnostics = nativeGetVideoDiagnostics()
-                    runOnUiThread {
-                        if (nativeStarted && running.get()) status.text = diagnostics
-                    }
-                }
                 val count = nativeDrainAudio(samples)
                 if (count > 0) audioTrack?.write(samples, 0, count)
                 nextFrame += frameNanos
