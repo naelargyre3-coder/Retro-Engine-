@@ -345,3 +345,24 @@ Corriger les bandes d'image étirées observées sur téléphone et appliquer le
 - La compilation, les tests automatisés et l'assemblage APK doivent encore être confirmés par le workflow CI.
 - Aucun test visuel sur téléphone n'a encore été réalisé après cette correction.
 - Le rendu 16:9 est appliqué par défaut dans ce correctif. Le choix utilisateur 4:3/16:9 dans les paramètres et la sélection d'orientation portrait/paysage/automatique restent à implémenter ; ils ne sont pas déclarés disponibles.
+
+
+## 2026-11-02 — Ajustement du cadrage : image entière sans zoom
+
+### Retour utilisateur
+Le rendu 16:9 précédent recadrait l'image (mise à l'échelle « cover »), ce qui produisait un zoom visuel non souhaité.
+
+### Fichier modifié
+- `app/src/main/jni/retro_frontend.cpp`
+
+### Correction
+- Passage de `std::max` à `std::min` pour utiliser une mise à l'échelle « contain » dans le viewport 16:9.
+- L'image complète du jeu est désormais conservée, sans recadrage ni étirement.
+- Les espaces non occupés par l'image restent noirs. Le viewport 16:9 reste centré dans la surface Android.
+- Le correctif précédent de suppression de l'étirement des pixels de bord est conservé.
+
+### Vérification et limites
+- Correction enregistrée sur la branche `v2.3-touch-controls`.
+- Compilation CI à vérifier après ce commit.
+- Test visuel sur téléphone requis pour confirmer le cadrage réel.
+- Le réglage interactif 4:3/16:9 et les modes portrait/paysage/automatique ne sont pas encore implémentés.
