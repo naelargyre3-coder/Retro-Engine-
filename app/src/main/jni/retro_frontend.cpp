@@ -294,6 +294,7 @@ Java_fr_retroengine_EmulatorActivity_nativeSetSurface(JNIEnv *env, jobject, jobj
     ANativeWindow *next = surface ? ANativeWindow_fromSurface(env, surface) : nullptr;
     if (window) ANativeWindow_release(window);
     window = next;
+    if (window) ANativeWindow_setBuffersGeometry(window, 0, 0, WINDOW_FORMAT_RGB_565);
 }
 
 extern "C" JNIEXPORT void JNICALL
