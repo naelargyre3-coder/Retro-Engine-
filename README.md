@@ -23,7 +23,7 @@ Retro Engine est un atelier Android destiné à préparer des applications de je
 
 **Frontend libretro Android — première implémentation :** une bibliothèque JNI distincte charge dynamiquement Nestopia, fournit les callbacks libretro vidéo/audio/entrée, lit une ROM depuis un fichier local, dessine les images dans une Surface Android et transmet le son à AudioTrack. L'écran d'émulation ajoute des commandes tactiles et accepte les événements de manettes/claviers Android.
 
-Cette première implémentation est expérimentale. Le build vérifie la compilation et la présence des deux bibliothèques natives dans l'APK, mais cela ne remplace pas un test d'exécution sur appareil. La compatibilité des options environnementales Nestopia, l'affichage réel, le son, les sauvegardes et les différents contrôleurs doivent encore être validés sur un téléphone. La cible native actuelle est arm64-v8a uniquement.
+Cette première implémentation est expérimentale. Le build vérifie la compilation et la présence des deux bibliothèques natives dans l'APK, mais cela ne remplace pas un test d'exécution sur appareil. La sauvegarde SRAM NES est maintenant chargée depuis un fichier privé propre à chaque ROM et réécrite à la mise en pause et à l’arrêt du moteur. Les sauvegardes d’état (snapshots), l’affichage réel, le son et les différents contrôleurs doivent encore être validés sur un téléphone. La cible native actuelle est arm64-v8a uniquement.
 
 ## Compilation
 
@@ -33,7 +33,7 @@ GitHub Actions exécute les tests unitaires, compile Nestopia, compile le fronte
 
 - Pas encore de génération d'APK autonome par ROM.
 - Pas encore d'interface de personnalisation de jeu.
-- Pas encore de système de sauvegardes/savestates exposé à l'utilisateur.
+- Sauvegarde SRAM automatique intégrée ; les sauvegardes d’état (savestates) ne sont pas encore disponibles.
 - Pas encore de filtres graphiques.
 - Pas encore de moteurs intégrés pour les autres consoles.
 - Pas encore de signature de production ni de pipeline de publication.
