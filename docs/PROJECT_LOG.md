@@ -322,3 +322,26 @@ Ouvrir une pull request vers `main` pour déclencher les tests et la compilation
 - Le workflow Android doit encore confirmer la compilation C++ native et l'assemblage de l'APK.
 - Aucun test visuel sur téléphone n'a encore été effectué ; il faudra vérifier que le zoom de 8 % est confortable et ne coupe aucun élément important du jeu.
 - Si le recadrage est trop important ou trop faible sur l'écran de l'utilisateur, le facteur de zoom pourra être ajusté.
+
+
+## 2026-11-02 — Correction du remplissage vidéo et viewport 16:9
+
+### Objectif
+Corriger les bandes d'image étirées observées sur téléphone et appliquer le choix utilisateur 16:9 sans déformer les pixels.
+
+### Fichiers modifiés
+- `app/src/main/jni/retro_frontend.cpp`
+- `docs/PROJECT_LOG.md`
+
+### Modifications
+- Remplacement du zoom arbitraire de 1,08 par un viewport 16:9 centré dans la surface Android.
+- Mise à l'échelle uniforme de type « cover » : l'image remplit le viewport 16:9 et le surplus est recadré, sans étirement.
+- Suppression du comportement fautif qui ramenait les coordonnées hors image aux pixels du bord avec `std::clamp`, ce qui étirait les rangées et colonnes de bord sur les bandes restantes.
+- Les zones hors viewport restent noires ; le format source et le stride de la surface sont conservés.
+- Ajout d'une validation du pitch source avant lecture des pixels.
+
+### Vérification et limites
+- Modification enregistrée sur la branche `v2.3-touch-controls`.
+- La compilation, les tests automatisés et l'assemblage APK doivent encore être confirmés par le workflow CI.
+- Aucun test visuel sur téléphone n'a encore été réalisé après cette correction.
+- Le rendu 16:9 est appliqué par défaut dans ce correctif. Le choix utilisateur 4:3/16:9 dans les paramètres et la sélection d'orientation portrait/paysage/automatique restent à implémenter ; ils ne sont pas déclarés disponibles.
