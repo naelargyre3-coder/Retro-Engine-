@@ -130,10 +130,6 @@ size_t audioBatch(const int16_t *data, size_t frames) {
     return frames;
 }
 
-uint8_t channel(uint32_t pixel, unsigned shift) {
-    return static_cast<uint8_t>((pixel >> shift) & 0xff);
-}
-
 void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) {
     if (!data || width == 0 || height == 0 || !window) return;
     ANativeWindow_Buffer buffer{};
@@ -190,7 +186,8 @@ bool openCore() {
     if (core.handle) return true;
     core.handle = dlopen("libnestopia_libretro.so", RTLD_NOW);
     if (!core.handle) {
-        lastError = std::string("Chargement du cœur NES impossible : ") + (dlerror() ? dlerror() : "bibliothèque absente");
+        const char *reason = dlerror();
+        lastError = std::string("Chargement du cœur NES impossible : ") + (reason ? reason : "bibliothèque absente");
         return false;
     }
 #define LOAD(name) if (!loadSymbol(core.name, "retro_" #name)) return false
