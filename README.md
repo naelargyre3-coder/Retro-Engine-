@@ -39,9 +39,10 @@ GitHub Actions exécute les tests unitaires, compile Nestopia, compile le fronte
 - Pas encore de signature de production ni de pipeline de publication.
 - Le logo officiel `retro_engine_logo.png` n'est pas encore intégré au dépôt. Le fichier source doit être importé avant de générer les ressources d'icône. Il s'agit uniquement de l'icône de Retro Engine ; les jeux exportés garderont leurs propres icônes personnalisables.
 
-## Suivi du développement
+## Documents de référence et suivi
 
-Le journal des interventions, vérifications, changements réellement enregistrés et tâches bloquées est disponible dans [docs/PROJECT_LOG.md](docs/PROJECT_LOG.md).
+- [Cahier des charges complet](docs/CAHIER_DES_CHARGES.md) — référence fonctionnelle et technique du projet.
+- [Journal de développement](docs/PROJECT_LOG.md) — historique daté des modifications, fichiers touchés, vérifications, résultats et tâches restantes. Il doit être actualisé à chaque ajout ou correction de l'application.
 
 ## Licences
 
