@@ -94,13 +94,13 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             text = "SAUVER"
             textSize = 10f
             isAllCaps = false
-            setOnClickListener { performStateAction { nativeSaveState() } }
+            setOnClickListener { performStateAction("État sauvegardé") { nativeSaveState() } }
         }
         val loadStateButton = Button(this).apply {
             text = "CHARGER"
             textSize = 10f
             isAllCaps = false
-            setOnClickListener { performStateAction { nativeLoadState() } }
+            setOnClickListener { performStateAction("État restauré") { nativeLoadState() } }
         }
         topBar.addView(saveStateButton, LinearLayout.LayoutParams(-2, dp(42)))
         topBar.addView(loadStateButton, LinearLayout.LayoutParams(-2, dp(42)))
@@ -198,11 +198,11 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         }
     }
 
-    private fun performStateAction(action: () -> String?) {
+    private fun performStateAction(successMessage: String, action: () -> String?) {
         if (!nativeStarted) return
         stopLoop()
         val error = action()
-        status.text = error ?: "Sauvegarde d’état mise à jour"
+        status.text = error ?: successMessage
         startAudioAndLoop()
     }
 
