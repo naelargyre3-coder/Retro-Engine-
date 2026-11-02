@@ -392,3 +392,28 @@ Ajouter un vrai réglage sélectionnable depuis le menu et corriger l'image NES 
 - Aucun test visuel sur téléphone n'a encore été effectué après cette modification.
 - Sur un écran physique 20:9, des marges peuvent subsister autour du viewport 16:9 ; elles sont attendues pour conserver le ratio sélectionné. Le choix 4:3 utilise un viewport plus étroit adapté au format classique des jeux NES.
 - Le choix du ratio est appliqué au lancement du jeu ; pour changer le format, revenir au menu, sélectionner l'autre ratio et relancer le jeu.
+
+
+## 2026-11-02 — Suppression des bandes noires en mode 16:9
+
+### Retour utilisateur
+- L'utilisateur confirme que les zones entourées sur la capture correspondent bien aux bandes noires à supprimer.
+
+### Fichiers modifiés
+- `app/src/main/jni/retro_frontend.cpp`
+- `docs/PROJECT_LOG.md`
+
+### Correction
+- En mode 16:9, le rendu utilise maintenant une mise à l'échelle uniforme de type « cover » calculée sur toute la surface Android, au lieu de placer l'image 4:3 dans un viewport plus petit.
+- L'image remplit donc la surface sans bandes noires dues au cadrage ; les parties excédentaires sont recadrées au centre, sans étirement.
+- Le mode 4:3 conserve l'image entière avec son rapport d'origine ; des marges peuvent rester dans ce mode lorsque la surface n'est pas au format 4:3.
+- Les conversions RGB565 et RGBA/RGBX8888, le stride et la validation du pitch source sont conservés.
+
+### Vérification et limites
+- Le changement de code est enregistré sur la branche `v2.3-touch-controls`.
+- La compilation native et l'assemblage APK doivent encore être vérifiés par le workflow CI.
+- Aucun test visuel sur téléphone n'a été réalisé après cette modification ; la suppression effective des bandes doit être confirmée après installation.
+- En mode 16:9, le recadrage central peut couper une partie de l'image NES, mais les proportions restent correctes.
+
+### Étape suivante
+- Compiler l'APK V2.3, l'installer sur le téléphone et vérifier que l'image remplit l'écran sans bandes noires gênantes.
