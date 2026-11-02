@@ -26,3 +26,14 @@ L'image officielle retro_engine_logo.png doit être ajoutée aux ressources Andr
 ## Compilation
 
 Le workflow GitHub Actions exécute les tests et produit app/build/outputs/apk/debug/app-debug.apk. L'APK est publié comme artefact de workflow après une exécution réussie.
+
+
+## Première étape NES
+
+L'import des fichiers .nes effectue maintenant une inspection de l'en-tête iNES :
+- signature du fichier et présence des 16 octets d'en-tête ;
+- identification iNES / NES 2.0 ;
+- lecture du mapper et des tailles PRG-ROM / CHR-ROM ;
+- vérification de la taille minimale pour iNES classique, avec prise en compte du trainer.
+
+Limites actuelles : le décodage avancé des tailles NES 2.0 reste à compléter. Cette inspection ne lance pas de jeu. Le cœur d'émulation Nestopia (GPL-2.0) est à intégrer dans une étape distincte, avec ses obligations de licence et de fourniture du code source correspondant.
