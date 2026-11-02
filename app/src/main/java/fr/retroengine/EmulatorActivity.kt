@@ -54,6 +54,7 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private external fun nativeDrainAudio(output: ShortArray): Int
     private external fun nativeGetSampleRate(): Double
     private external fun nativeGetFps(): Double
+    private external fun nativeGetVideoDiagnostics(): String
     private external fun nativeSaveRam()
     private external fun nativeSaveState(): String?
     private external fun nativeLoadState(): String?
@@ -87,7 +88,9 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             setPadding(dp(8), dp(4), dp(8), dp(4))
             setBackgroundColor(0x99000000.toInt())
         }
-        status.maxWidth = dp(150)
+        status.maxWidth = dp(230)
+        status.maxLines = 3
+        status.textSize = 10f
         topBar.addView(status, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL))
 
         // START et SELECT forment un groupe distinct, centré horizontalement en haut de l'écran.
@@ -251,9 +254,18 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         renderThread = Thread({
             val samples = ShortArray(4096)
             var nextFrame = System.nanoTime()
+            var diagnosticFrames = 0
             while (running.get()) {
                 nativeSetInputMask(currentInputMask)
                 nativeRunFrame()
+                diagnosticFrames++
+                if (diagnosticFrames >= 60) {
+                    diagnosticFrames = 0
+                    val diagnostics = nativeGetVideoDiagnostics()
+                    runOnUiThread {
+                        if (nativeStarted && running.get()) status.text = diagnostics
+                    }
+                }
                 val count = nativeDrainAudio(samples)
                 if (count > 0) audioTrack?.write(samples, 0, count)
                 nextFrame += frameNanos

@@ -61,6 +61,16 @@ std::atomic<int> pixelFormat{RETRO_PIXEL_FORMAT_RGB565};
 std::atomic<unsigned> videoCallbackCount{0};
 std::atomic<unsigned> frameRunCount{0};
 std::atomic<unsigned> windowLockFailures{0};
+std::atomic<unsigned> windowPostFailures{0};
+std::atomic<unsigned> unsupportedBufferFormats{0};
+std::atomic<unsigned> lastSourceWidth{0};
+std::atomic<unsigned> lastSourceHeight{0};
+std::atomic<unsigned> lastSourcePitch{0};
+std::atomic<unsigned> lastBufferWidth{0};
+std::atomic<unsigned> lastBufferHeight{0};
+std::atomic<int> lastSourcePixelFormat{RETRO_PIXEL_FORMAT_RGB565};
+std::atomic<int> lastBufferFormat{0};
+std::atomic<int> lastGeometryResult{0};
 double fps = 60.0;
 double sampleRate = 32040.0;
 bool initialized = false;
@@ -149,17 +159,41 @@ size_t audioBatch(const int16_t *data, size_t frames) {
 
 void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) {
     const unsigned callbackNumber = videoCallbackCount.fetch_add(1) + 1;
-    if (callbackNumber <= 5) LOGI("Video callback #%u: data=%p, %ux%u, pitch=%zu, format=%d", callbackNumber, data, width, height, pitch, pixelFormat.load());
+    const int sourceFormat = pixelFormat.load();
+    lastSourceWidth.store(width);
+    lastSourceHeight.store(height);
+    lastSourcePitch.store(static_cast<unsigned>(std::min<size_t>(pitch, UINT32_MAX)));
+    lastSourcePixelFormat.store(sourceFormat);
+    if (callbackNumber <= 5) LOGI("Video callback #%u: data=%p, %ux%u, pitch=%zu, format=%d", callbackNumber, data, width, height, pitch, sourceFormat);
     if (!data || width == 0 || height == 0) return;
+
     std::lock_guard<std::mutex> windowLock(windowMutex);
     if (!window) return;
+
     ANativeWindow_Buffer buffer{};
     if (ANativeWindow_lock(window, &buffer, nullptr) != 0) {
         const unsigned failure = windowLockFailures.fetch_add(1) + 1;
         if (failure <= 5) LOGE("ANativeWindow_lock a échoué (tentative %u).", failure);
         return;
     }
+
+    lastBufferWidth.store(static_cast<unsigned>(std::max(0, buffer.width)));
+    lastBufferHeight.store(static_cast<unsigned>(std::max(0, buffer.height)));
+    lastBufferFormat.store(buffer.format);
     if (callbackNumber == 1) LOGI("Surface native: %dx%d, stride=%d, format=%d", buffer.width, buffer.height, buffer.stride, buffer.format);
+
+    const bool output565 = buffer.format == WINDOW_FORMAT_RGB_565;
+    const bool output8888 = buffer.format == WINDOW_FORMAT_RGBA_8888 ||
+                            buffer.format == WINDOW_FORMAT_RGBX_8888;
+    if (buffer.width <= 0 || buffer.height <= 0 || buffer.stride < buffer.width ||
+        (!output565 && !output8888)) {
+        const unsigned failure = unsupportedBufferFormats.fetch_add(1) + 1;
+        if (failure <= 5) LOGE("Format ou dimensions de surface non pris en charge: %dx%d stride=%d format=%d",
+                               buffer.width, buffer.height, buffer.stride, buffer.format);
+        const int postResult = ANativeWindow_unlockAndPost(window);
+        if (postResult != 0) windowPostFailures.fetch_add(1);
+        return;
+    }
 
     const float scale = std::min(
         static_cast<float>(buffer.width) / static_cast<float>(width),
@@ -168,44 +202,68 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
     const int drawHeight = std::max(1, static_cast<int>(height * scale));
     const int offsetX = (buffer.width - drawWidth) / 2;
     const int offsetY = (buffer.height - drawHeight) / 2;
-    auto *dst = static_cast<uint16_t *>(buffer.bits);
+
+    auto *dst565 = output565 ? static_cast<uint16_t *>(buffer.bits) : nullptr;
+    auto *dst8888 = output8888 ? static_cast<uint8_t *>(buffer.bits) : nullptr;
     for (int y = 0; y < buffer.height; ++y) {
-        auto *row = dst + y * buffer.stride;
-        std::fill(row, row + buffer.width, static_cast<uint16_t>(0));
+        if (output565) {
+            auto *row = dst565 + y * buffer.stride;
+            std::fill(row, row + buffer.width, static_cast<uint16_t>(0));
+        } else {
+            auto *row = dst8888 + y * buffer.stride * 4;
+            std::fill(row, row + buffer.width * 4, static_cast<uint8_t>(0));
+            for (int x = 0; x < buffer.width; ++x) row[x * 4 + 3] = 0xff;
+        }
     }
 
-    const int format = pixelFormat.load();
     const auto *source = static_cast<const uint8_t *>(data);
     for (int y = 0; y < drawHeight; ++y) {
         const unsigned sourceY = std::min(height - 1, static_cast<unsigned>(y / scale));
-        auto *row = dst + (offsetY + y) * buffer.stride;
+        auto *row565 = output565 ? dst565 + (offsetY + y) * buffer.stride : nullptr;
+        auto *row8888 = output8888 ? dst8888 + (offsetY + y) * buffer.stride * 4 : nullptr;
         for (int x = 0; x < drawWidth; ++x) {
             const unsigned sourceX = std::min(width - 1, static_cast<unsigned>(x / scale));
-            uint8_t r = 0, g = 0, b = 0;
             const uint8_t *p = source + sourceY * pitch;
-            if (format == RETRO_PIXEL_FORMAT_XRGB8888) {
+            uint8_t r = 0, g = 0, b = 0;
+            if (sourceFormat == RETRO_PIXEL_FORMAT_XRGB8888) {
                 uint32_t raw;
                 std::memcpy(&raw, p + sourceX * 4, sizeof(raw));
                 r = static_cast<uint8_t>((raw >> 16) & 0xff);
                 g = static_cast<uint8_t>((raw >> 8) & 0xff);
                 b = static_cast<uint8_t>(raw & 0xff);
-            } else if (format == RETRO_PIXEL_FORMAT_RGB565) {
+            } else if (sourceFormat == RETRO_PIXEL_FORMAT_RGB565) {
                 uint16_t raw;
                 std::memcpy(&raw, p + sourceX * 2, sizeof(raw));
                 r = static_cast<uint8_t>(((raw >> 11) & 0x1F) * 255 / 31);
                 g = static_cast<uint8_t>(((raw >> 5) & 0x3F) * 255 / 63);
                 b = static_cast<uint8_t>((raw & 0x1F) * 255 / 31);
-            } else {
+            } else if (sourceFormat == RETRO_PIXEL_FORMAT_0RGB1555) {
                 uint16_t raw;
                 std::memcpy(&raw, p + sourceX * 2, sizeof(raw));
                 r = static_cast<uint8_t>(((raw >> 10) & 0x1F) * 255 / 31);
                 g = static_cast<uint8_t>(((raw >> 5) & 0x1F) * 255 / 31);
                 b = static_cast<uint8_t>((raw & 0x1F) * 255 / 31);
+            } else {
+                continue;
             }
-            row[offsetX + x] = static_cast<uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+
+            if (output565) {
+                row565[offsetX + x] = static_cast<uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+            } else {
+                uint8_t *pixel = row8888 + (offsetX + x) * 4;
+                pixel[0] = r;
+                pixel[1] = g;
+                pixel[2] = b;
+                pixel[3] = 0xff;
+            }
         }
     }
-    ANativeWindow_unlockAndPost(window);
+
+    const int postResult = ANativeWindow_unlockAndPost(window);
+    if (postResult != 0) {
+        const unsigned failure = windowPostFailures.fetch_add(1) + 1;
+        if (failure <= 5) LOGE("ANativeWindow_unlockAndPost a échoué (tentative %u, code %d).", failure, postResult);
+    }
 }
 
 std::string makeSavePath(const std::vector<uint8_t> &bytes) {
@@ -353,6 +411,16 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
     videoCallbackCount.store(0);
     frameRunCount.store(0);
     windowLockFailures.store(0);
+    windowPostFailures.store(0);
+    unsupportedBufferFormats.store(0);
+    lastSourceWidth.store(0);
+    lastSourceHeight.store(0);
+    lastSourcePitch.store(0);
+    lastBufferWidth.store(0);
+    lastBufferHeight.store(0);
+    lastSourcePixelFormat.store(RETRO_PIXEL_FORMAT_RGB565);
+    lastBufferFormat.store(0);
+    lastGeometryResult.store(0);
     const char *sys = env->GetStringUTFChars(systemDir, nullptr);
     const char *save = env->GetStringUTFChars(saveDir, nullptr);
     systemDirectory = sys ? sys : "";
@@ -365,7 +433,13 @@ Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject s
         std::lock_guard<std::mutex> windowLock(windowMutex);
         if (window) ANativeWindow_release(window);
         window = nextWindow;
-        if (window) ANativeWindow_setBuffersGeometry(window, 0, 0, WINDOW_FORMAT_RGB_565);
+        if (window) {
+            const int geometryResult = ANativeWindow_setBuffersGeometry(window, 0, 0, WINDOW_FORMAT_RGB_565);
+            lastGeometryResult.store(geometryResult);
+            if (geometryResult != 0) LOGE("ANativeWindow_setBuffersGeometry a échoué: %d", geometryResult);
+        } else {
+            lastGeometryResult.store(-1);
+        }
     }
     if (!nextWindow) lastError = "Surface Android indisponible.";
     if (!lastError.empty()) return env->NewStringUTF(lastError.c_str());
@@ -426,7 +500,13 @@ Java_fr_retroengine_EmulatorActivity_nativeSetSurface(JNIEnv *env, jobject, jobj
     std::lock_guard<std::mutex> windowLock(windowMutex);
     if (window) ANativeWindow_release(window);
     window = next;
-    if (window) ANativeWindow_setBuffersGeometry(window, 0, 0, WINDOW_FORMAT_RGB_565);
+    if (window) {
+        const int geometryResult = ANativeWindow_setBuffersGeometry(window, 0, 0, WINDOW_FORMAT_RGB_565);
+        lastGeometryResult.store(geometryResult);
+        if (geometryResult != 0) LOGE("ANativeWindow_setBuffersGeometry (surfaceChanged) a échoué: %d", geometryResult);
+    } else {
+        lastGeometryResult.store(-1);
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -467,6 +547,19 @@ Java_fr_retroengine_EmulatorActivity_nativeGetSampleRate(JNIEnv *, jobject) {
 extern "C" JNIEXPORT jdouble JNICALL
 Java_fr_retroengine_EmulatorActivity_nativeGetFps(JNIEnv *, jobject) {
     return fps;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_fr_retroengine_EmulatorActivity_nativeGetVideoDiagnostics(JNIEnv *env, jobject) {
+    char message[256];
+    snprintf(message, sizeof(message),
+             "Trames: %u · images: %u\\nSource: %ux%u PF%d | Surface: %ux%u PF%d\\nVerrou: %u · publication: %u · format: %u · géométrie: %d",
+             frameRunCount.load(), videoCallbackCount.load(),
+             lastSourceWidth.load(), lastSourceHeight.load(), lastSourcePixelFormat.load(),
+             lastBufferWidth.load(), lastBufferHeight.load(), lastBufferFormat.load(),
+             windowLockFailures.load(), windowPostFailures.load(),
+             unsupportedBufferFormats.load(), lastGeometryResult.load());
+    return env->NewStringUTF(message);
 }
 
 extern "C" JNIEXPORT jstring JNICALL

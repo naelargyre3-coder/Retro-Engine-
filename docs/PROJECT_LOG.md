@@ -145,3 +145,29 @@ Identifier la cause de l'écran noir persistant sans présenter une hypothèse c
 - Le code est enregistré sur `main`; le workflow de ce commit doit encore confirmer compilation et assemblage APK.
 - Aucun essai sur téléphone ni journal Logcat de l'appareil n'est disponible à cette étape.
 - L'écran noir reste non résolu. Les traces doivent permettre de distinguer absence de callback vidéo, boucle inactive et échec de publication de la surface.
+
+## 2026-11-02 — Diagnostic vidéo visible et prise en charge des formats de surface Android
+
+### Objectif
+Rendre le diagnostic de l'écran noir exploitable directement depuis le téléphone et éviter de supposer que le buffer de la surface Android est toujours en RGB565.
+
+### Fichiers modifiés
+- `app/src/main/jni/retro_frontend.cpp`
+- `app/src/main/java/fr/retroengine/EmulatorActivity.kt`
+- `docs/PROJECT_LOG.md`
+
+### Modifications
+- Le rendu vérifie désormais le format réel du buffer Android après verrouillage.
+- Ajout de chemins d'écriture distincts pour les surfaces RGB565, RGBA8888 et RGBX8888, en tenant compte du stride réel.
+- Ajout de compteurs pour les callbacks vidéo, les images émulateur, les échecs de verrouillage, les échecs de publication et les formats de surface non pris en charge.
+- Enregistrement des dimensions, du pitch, du format de pixels source, du format et des dimensions du buffer Android, ainsi que du résultat de configuration de la géométrie.
+- Ajout d'un diagnostic compact visible dans la barre supérieure de l'émulateur, actualisé environ une fois par seconde.
+
+### Vérification et limites
+- La modification vise à diagnostiquer les différences de format de buffer entre appareils et à prendre en charge les formats Android courants.
+- Le workflow CI doit confirmer la compilation C++/Kotlin et l'assemblage APK.
+- Aucun essai sur téléphone n'a encore été réalisé ; l'écran noir n'est donc pas déclaré résolu.
+- Si l'image reste noire, les compteurs visibles permettront de distinguer l'absence de callbacks, un échec d'accès à la surface ou un échec de publication.
+
+### Étape suivante
+Installer l'APK CI sur le téléphone, lancer une ROM NES et relever les compteurs affichés dans la barre supérieure avant de poursuivre les ajustements des manettes des autres consoles.
