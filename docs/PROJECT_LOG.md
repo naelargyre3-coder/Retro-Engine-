@@ -227,3 +227,49 @@ Installer l'APK CI sur le téléphone, lancer une ROM NES et relever les compteu
 
 ### Étape suivante
 Ouvrir une pull request vers `main` pour déclencher les tests et la compilation de l'APK V2.3, puis installer cette version sur téléphone pour valider les commandes tactiles et la persistance des sauvegardes.
+
+
+
+## 2026-11-02 — Ajustements V2.3 après retour sur capture d’écran
+
+### Version suivie
+- Version Android du projet : **2.3** (versionCode 3).
+- Branche de travail : `v2.3-touch-controls`.
+- Ces corrections restent dans le cycle de test V2.3 ; elles ne constituent pas une version publiée ni validée sur téléphone.
+
+### Retours utilisateur
+- Des bandes noires sont visibles autour de l’image de jeu.
+- Les barres système Android (heure, batterie, notifications et navigation) restent affichées pendant le jeu.
+- Certaines commandes ne répondent pas, particulièrement avec une manette physique.
+- La croix directionnelle n’a pas un aspect uniforme ; la touche bas paraît notamment tronquée.
+
+### Fichier modifié
+- `app/src/main/java/fr/retroengine/EmulatorActivity.kt`
+
+### Modifications enregistrées
+- Activation du mode immersif Android pour masquer les barres d’état et de navigation pendant l’émulation ; réapplication lorsque la fenêtre reprend le focus.
+- Agrandissement de la zone de commandes inférieure afin que les trois rangées de la croix directionnelle disposent de la hauteur nécessaire.
+- Alignement des cellules de la croix sur une grille régulière ; l’espace central est dimensionné pour correspondre aux boutons et à leurs marges.
+- Séparation des entrées tactiles et des entrées physiques afin qu’un relâchement sur un périphérique ne neutralise pas une touche encore maintenue sur l’autre.
+- Suivi des touches physiques simultanées par code de touche.
+- Ajout de la lecture des axes de joystick et du chapeau directionnel (HAT) pour les manettes qui transmettent les directions sous forme d’axes.
+- Interception des événements de touches au niveau de l’activité pour améliorer leur réception même lorsque la surface de jeu a le focus.
+
+### À propos des bandes noires
+- La capture montre des marges noires latérales autour de l’image NES. Le rendu actuel conserve le rapport largeur/hauteur de l’image source ; ces marges évitent de déformer l’image sur un écran de téléphone très large.
+- Leur suppression complète nécessiterait d’étirer ou de recadrer l’image. Aucun étirement ni recadrage n’a été appliqué dans cette intervention afin de préserver l’image du jeu.
+
+### Vérification et limites
+- Les changements sont enregistrés sur la branche `v2.3-touch-controls`.
+- La compilation CI doit confirmer que les modifications Kotlin sont valides et que l’APK peut être assemblé.
+- Aucun test avec une manette physique n’a été effectué dans cet environnement.
+- Le masquage des barres système et l’alignement visuel doivent être contrôlés sur le téléphone après installation.
+- La réception des axes analogiques dépend des événements réellement émis par la manette Android ; plusieurs modèles de manettes devront être testés.
+- La version reste **V2.3** tant que ce cycle de corrections et de validation n’est pas terminé.
+
+### Prochaine vérification
+1. Compiler l’APK V2.3.
+2. Tester les quatre directions, A/B, SELECT et START sur écran tactile.
+3. Tester une manette physique : croix, stick analogique, boutons et combinaisons simultanées.
+4. Vérifier que les barres Android restent masquées pendant le jeu.
+5. Confirmer si les marges noires latérales doivent être conservées (image non déformée) ou si l’utilisateur préfère un affichage étiré.
