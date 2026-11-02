@@ -196,19 +196,29 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
         return;
     }
 
-    // L'image NES est calculée au rapport de présentation 4:3.
-    // En mode 16:9, « remplir » couvre toute la surface sans déformation :
-    // les bords excédentaires sont recadrés au centre, jamais remplacés par du noir.
-    // En mode 4:3, l'image entière reste visible et des marges peuvent subsister.
+    // Le mode 16:9 réserve un cadre 16:9 centré dans la surface Android.
+    // L'image NES (présentation 4:3) est entièrement contenue dans ce cadre :
+    // aucun recadrage ni étirement ; les zones restantes restent noires.
     const float surfaceWidth = static_cast<float>(buffer.width);
     const float surfaceHeight = static_cast<float>(buffer.height);
+    const bool widescreenFrame = displayAspectMode.load() != 0;
+    float frameWidth = surfaceWidth;
+    float frameHeight = surfaceHeight;
+    if (widescreenFrame) {
+        const float frameScale = std::min(surfaceWidth / 16.0f, surfaceHeight / 9.0f);
+        frameWidth = 16.0f * frameScale;
+        frameHeight = 9.0f * frameScale;
+    }
+    const float frameLeft = (surfaceWidth - frameWidth) * 0.5f;
+    const float frameTop = (surfaceHeight - frameHeight) * 0.5f;
     const float displayWidth = static_cast<float>(height) * (4.0f / 3.0f);
-    const bool fillSurface = displayAspectMode.load() != 0;
-    const float scaleX = surfaceWidth / displayWidth;
-    const float scaleY = surfaceHeight / static_cast<float>(height);
-    const float scale = fillSurface ? std::max(scaleX, scaleY) : std::min(scaleX, scaleY);
-    const float offsetX = (surfaceWidth - displayWidth * scale) * 0.5f;
-    const float offsetY = (surfaceHeight - static_cast<float>(height) * scale) * 0.5f;
+    const float gameScale = std::min(frameWidth / displayWidth,
+                                     frameHeight / static_cast<float>(height));
+    const float gameWidth = displayWidth * gameScale;
+    const float gameHeight = static_cast<float>(height) * gameScale;
+    const float offsetX = frameLeft + (frameWidth - gameWidth) * 0.5f;
+    const float offsetY = frameTop + (frameHeight - gameHeight) * 0.5f;
+    const float scale = gameScale;
 
     auto *dst565 = output565 ? static_cast<uint16_t *>(buffer.bits) : nullptr;
     auto *dst8888 = output8888 ? static_cast<uint8_t *>(buffer.bits) : nullptr;
