@@ -279,3 +279,25 @@ Ouvrir une pull request vers `main` pour déclencher les tests et la compilation
 - L'utilisateur confirme que la sauvegarde fonctionne avec **The Legend of Zelda (NES)** dans Retro Engine.
 - Ce résultat valide le fonctionnement de la sauvegarde SRAM pour ce jeu dans l'environnement testé.
 - Cela ne prouve pas encore que tous les jeux NES sauvegardent correctement : le comportement dépend du système de sauvegarde de chaque cartouche.
+
+
+## 2026-11-02 — Correction de l'arrière-plan et de l'occupation de l'écran du menu
+
+### Retour utilisateur
+- La capture du menu d'accueil montre une grande zone blanche sous le contenu sombre.
+- L'utilisateur souhaite que le menu occupe proprement l'écran et que cet espace blanc disparaisse.
+
+### Fichier modifié
+- `app/src/main/java/fr/retroengine/MainActivity.kt`
+
+### Modifications enregistrées
+- Le conteneur `ScrollView` reçoit maintenant explicitement le même fond sombre que le menu.
+- Activation de `isFillViewport` pour que le contenu puisse occuper toute la hauteur disponible lorsque l'écran est plus grand que le menu.
+- Ajout d'un espace flexible et d'un pied de page discret « RETRO ENGINE • VERSION EXPÉRIMENTALE » afin de répartir proprement la hauteur restante sans ajouter de fausse fonctionnalité.
+- Le bouton d'import, les informations du moteur NES et le parcours de sélection de ROM sont conservés.
+
+### Vérification et limites
+- Correction enregistrée sur la branche `v2.3-touch-controls` dans le commit associé au menu.
+- La compilation Android et l'assemblage APK doivent encore confirmer la validité de cette modification.
+- Aucun test visuel sur téléphone n'a encore été réalisé après ce changement ; l'utilisateur devra vérifier que le fond sombre couvre bien toute la zone située sous le menu.
+- Cette correction ne change pas le fonctionnement de l'import de ROM ni le moteur d'émulation.
