@@ -124,6 +124,7 @@ void audioSample(int16_t left, int16_t right) {
 
 size_t audioBatch(const int16_t *data, size_t frames) {
     if (!data || frames == 0) return 0;
+    const size_t requestedFrames = frames;
     std::lock_guard<std::mutex> lock(audioMutex);
     const size_t samples = frames * 2;
     const size_t maxQueue = 65536;
@@ -138,7 +139,7 @@ size_t audioBatch(const int16_t *data, size_t frames) {
         }
     }
     audioQueue.insert(audioQueue.end(), data, data + frames * 2);
-    return frames;
+    return requestedFrames;
 }
 
 void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) {
