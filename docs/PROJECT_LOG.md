@@ -481,3 +481,37 @@ Ajouter un vrai réglage sélectionnable depuis le menu et corriger l'image NES 
 - La CI confirme la compilation et les contrôles automatisés, pas le rendu visuel sur un téléphone.
 - Le cadre 16:9 est un viewport logique : il n'est pas dessiné comme un contour décoratif. L'image 4:3 est centrée à l'intérieur, avec des marges noires latérales.
 - Le test sur appareil reste nécessaire pour confirmer le résultat réel sur l'écran cible.
+
+
+## 2026-11-05 — Première intégration de l'overlay tactile NES
+
+### Référence consultée
+- Cahier des charges et historique relus dans `docs/PROJECT_LOG.md`.
+- Branche de travail : `v2.3-touch-controls`.
+- L'intégration conserve le masque d'entrées natif Nestopia et la séparation existante entre entrées tactiles et matérielles.
+
+### Fichiers créés ou modifiés
+- `app/src/main/java/fr/retroengine/ControllerLayout.kt` — configuration NES normalisée, indépendante de la taille d'écran, avec positions distinctes selon l'orientation.
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt` — dessin semi-transparent, D-pad et suivi multi-pointeur, diagonales, zones tactiles élargies, vibration courte.
+- `app/src/main/java/fr/retroengine/EmulatorActivity.kt` — remplacement des anciens widgets tactiles par la vue overlay superposée à la surface vidéo.
+- `app/src/main/AndroidManifest.xml` — déclaration de la permission Android VIBRATE.
+
+### Comportement intégré
+- Overlay NES : D-pad à gauche, B à gauche de A à droite, SELECT et START au centre en bas.
+- Opacité initiale : 50 %, enregistrée dans les préférences locales du jeu.
+- Positions relatives adaptées au mode portrait et paysage.
+- Le suivi des identifiants de pointeurs permet de maintenir plusieurs commandes simultanément.
+- Le masque combiné continue d'être transmis par le mécanisme d'entrée existant.
+- Aucun bouton menu, mode déplacement ou bouton de réinitialisation n'est ajouté, conformément aux dernières décisions utilisateur.
+
+### Vérification et limites
+- Les fichiers ont été enregistrés sur la branche `v2.3-touch-controls`.
+- La compilation CI déclenchée par les commits doit encore être consultée ; aucune réussite de compilation n'est revendiquée ici.
+- Aucun essai tactile sur téléphone n'a été réalisé dans cette intervention.
+- L'interface de réglage de l'opacité/vibration, le curseur de taille, la détection Bluetooth et la persistance des réglages par APK restent à intégrer.
+- Les layouts SNES, Game Boy, Game Boy Color, GBA, Mega Drive et N64 restent à créer.
+- Le réglage portrait/paysage utilise actuellement deux géométries intégrées au layout ; la restauration Android et la rotation réelle doivent être testées sur appareil.
+- Le code de sauvegarde SRAM existant n'a pas été remplacé. L'isolation des données par APK généré devra être assurée lors du chantier de génération autonome des APK.
+
+### Prochaine étape
+Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de compilation, puis tester les directions, diagonales, boutons simultanés, vibration et orientation sur téléphone avant d'étendre l'architecture aux autres consoles.
