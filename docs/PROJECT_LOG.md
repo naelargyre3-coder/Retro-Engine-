@@ -540,3 +540,29 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - Ces nouveaux ajustements doivent encore être compilés par le prochain workflow.
 - Aucun test visuel sur téléphone n'a encore été effectué pour cette nouvelle apparence.
 - Le retour exact à la maquette reste à affiner à partir d'une capture de l'APK installée et, si nécessaire, de la maquette de référence.
+
+
+## 2026-11-05 — Reprise visuelle de la manette NES selon la maquette
+
+### Retour utilisateur
+- Les commandes précédentes ne ressemblaient pas à la maquette et leur agrandissement excessif ne convenait pas.
+- Le plan de reprise visuelle a été approuvé : D-pad gris en relief, boutons A/B rouges circulaires, SELECT/START regroupés en haut au centre, sans L/R sur le layout NES.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/ControllerLayout.kt`
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+- `docs/PROJECT_LOG.md`
+
+### Corrections effectuées
+- Suppression des boutons A/B carrés arrondis et retour à deux boutons circulaires rouges, de diamètre réduit et mieux proportionné.
+- Ajout d'un contour lumineux discret, d'une ombre et d'un reflet pour retrouver l'aspect bombé de boutons physiques.
+- Refonte de la croix directionnelle : branches anthracite, biseau clair, ombre portée et repères directionnels.
+- Déplacement de SELECT et START dans un petit groupe centré en haut de l'écran.
+- Conservation des zones tactiles plus larges que les dessins, du multitouch, des diagonales, de la vibration réglable et de l'opacité initiale de 50 %.
+- Aucun bouton L/R, menu, mode déplacement ou réinitialisation n'a été ajouté.
+
+### Vérification et limites
+- Les changements sont enregistrés dans ce commit sur `v2.3-touch-controls`.
+- La compilation et l'assemblage APK doivent être confirmés par le workflow GitHub Actions déclenché par ce commit.
+- Aucun test tactile ou contrôle visuel sur téléphone n'a été effectué ici.
+- Les réglages d'opacité/vibration sont conservés dans les préférences existantes ; un panneau de réglage utilisateur, la taille réglable et la détection Bluetooth restent des tâches distinctes non déclarées comme terminées.
