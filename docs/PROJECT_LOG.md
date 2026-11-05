@@ -515,3 +515,28 @@ Ajouter un vrai réglage sélectionnable depuis le menu et corriger l'image NES 
 
 ### Prochaine étape
 Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de compilation, puis tester les directions, diagonales, boutons simultanés, vibration et orientation sur téléphone avant d'étendre l'architecture aux autres consoles.
+
+
+## 2026-11-05 — Agrandissement et rapprochement visuel de la maquette NES
+
+### Retour utilisateur
+- La première APK installée compile et se télécharge correctement.
+- Les commandes tactiles sont trop petites et leur apparence ne correspond pas à la maquette.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/ControllerLayout.kt`
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+- `docs/PROJECT_LOG.md`
+
+### Ajustements réalisés
+- Agrandissement des boutons A/B (rayon visuel porté d'environ 0,065 à 0,110 de la dimension de référence en paysage).
+- Augmentation de l'écartement entre A et B pour conserver une séparation confortable.
+- Agrandissement de SELECT/START.
+- Croix directionnelle élargie et zones tactiles directionnelles étendues.
+- Boutons d'action redessinés en carrés arrondis avec contour clair plus marqué, au lieu des simples cercles de la première version.
+
+### Vérification et limites
+- Le workflow précédent n°82 a réussi (compilation APK confirmée par GitHub Actions).
+- Ces nouveaux ajustements doivent encore être compilés par le prochain workflow.
+- Aucun test visuel sur téléphone n'a encore été effectué pour cette nouvelle apparence.
+- Le retour exact à la maquette reste à affiner à partir d'une capture de l'APK installée et, si nécessaire, de la maquette de référence.
