@@ -590,3 +590,20 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - La compilation Kotlin/Android et l'assemblage APK doivent encore être confirmés par GitHub Actions.
 - Aucun rendu de l'APK n'a été inspecté sur téléphone après ce changement ; la ressemblance finale avec la capture reste à confirmer visuellement.
 - Aucun test tactile sur appareil n'a été effectué dans cette intervention.
+
+## 2026-11-05 — Repositionnement de SELECT et START en bas au centre
+
+### Retour utilisateur
+- SELECT et START doivent être placés en bas au centre de l'écran, et non en haut.
+
+### Fichier modifié
+- `app/src/main/java/fr/retroengine/ControllerLayout.kt`
+
+### Modification enregistrée
+- La coordonnée verticale normalisée des deux boutons système passe de 0,105 à 0,91, en portrait comme en paysage.
+- Les positions horizontales centrées, dimensions, zones tactiles et masques d'entrée restent inchangés.
+
+### Vérification et limites
+- Modification enregistrée sur `v2.3-touch-controls`.
+- La compilation doit être vérifiée par GitHub Actions.
+- Le remplacement des dégradés par les textures bitmap directement extraites de la capture reste à réaliser ; la conformité visuelle complète n'est donc pas encore atteinte.
