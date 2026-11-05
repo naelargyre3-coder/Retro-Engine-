@@ -566,3 +566,27 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - La compilation et l'assemblage APK doivent être confirmés par le workflow GitHub Actions déclenché par ce commit.
 - Aucun test tactile ou contrôle visuel sur téléphone n'a été effectué ici.
 - Les réglages d'opacité/vibration sont conservés dans les préférences existantes ; un panneau de réglage utilisateur, la taille réglable et la détection Bluetooth restent des tâches distinctes non déclarées comme terminées.
+
+
+## 2026-11-05 — Amélioration des textures de la manette tactile NES
+
+### Clarification utilisateur
+- La demande concerne le **rendu des textures**, et non la taille ni la disposition des commandes.
+- La référence visuelle attendue est la capture fournie : boutons rouges brillants, D-pad gris métallique en relief et commandes système à finition métallique.
+- Le cahier des charges reste prioritaire : la manette NES affiche uniquement la croix, A, B, START et SELECT. Aucun bouton L/R n'est ajouté à la NES.
+
+### Fichier modifié
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+
+### Modifications enregistrées
+- Boutons A/B : coque sombre, bague métallique dégradée, face rouge en plusieurs nuances, reflet radial, éclat supérieur et contour intérieur.
+- SELECT/START : finition gris acier, coque en dégradé, surface satinée, liseré clair et ombrage inférieur.
+- D-pad : branches anthracite avec dégradés directionnels, biseaux, relief, ombre portée et gravures directionnelles.
+- Le dessin conserve les dimensions, coordonnées, zones tactiles, masques d'entrée et commandes définis auparavant.
+- L'opacité initiale reste à 50 %. Le multitouch, les diagonales et la vibration ne sont pas modifiés.
+
+### Vérification et limites
+- Modification enregistrée sur la branche `v2.3-touch-controls`, commit `1d95c7115d44dbc7e0f0ef86485ed939a3118a68`.
+- La compilation Kotlin/Android et l'assemblage APK doivent encore être confirmés par GitHub Actions.
+- Aucun rendu de l'APK n'a été inspecté sur téléphone après ce changement ; la ressemblance finale avec la capture reste à confirmer visuellement.
+- Aucun test tactile sur appareil n'a été effectué dans cette intervention.
