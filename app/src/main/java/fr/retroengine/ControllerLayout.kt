@@ -30,7 +30,7 @@ object ControllerLayout {
         val actionLeft = if (isPortrait) 0.735f else 0.775f
         val actionRight = if (isPortrait) 0.895f else 0.895f
         val radius = if (isPortrait) 0.078f else 0.073f
-        val systemY = if (isPortrait) 0.105f else 0.105f
+        val systemY = if (isPortrait) 0.91f else 0.91f
 
         return listOf(
             ControllerButton("B", NES_B, actionLeft, actionY, radius, Color.rgb(205, 42, 55)),
