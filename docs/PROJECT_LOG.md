@@ -675,3 +675,28 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - Code enregistré sur la branche `v2.3-touch-controls`.
 - Le workflow GitHub Actions doit confirmer la compilation Kotlin/Android et l'assemblage APK.
 - Aucun aperçu de l'APK ni test sur téléphone n'est disponible à cette étape ; le rendu pixel-art final reste à valider sur appareil.
+
+
+## 2026-11-05 — Annulation du rendu pixel-art et retour au style lisse de la maquette NES
+
+### Clarification utilisateur
+- L'utilisateur confirme qu'il ne souhaite pas de rendu pixel-art pour les commandes.
+- La maquette de référence montre des boutons 3D lisses : D-pad gris métallique, boutons A/B rouges brillants et capsules SELECT/START gris acier.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+- `docs/PROJECT_LOG.md`
+
+### Modifications
+- Suppression du dessin en rectangles et bandes pixelisées.
+- Retour à un rendu Android Canvas anti-crénelé avec dégradés linéaires/radiaux, ombres, biseaux, reflets et contours arrondis.
+- A/B sont dessinés comme des boutons circulaires rouges bombés avec bague métallique et lettrage blanc.
+- SELECT/START sont dessinés comme des capsules gris foncé avec double contour acier et texte clair.
+- La croix directionnelle est reconstruite avec des branches arrondies gris métallique, un moyeu central et des repères directionnels.
+- Les positions, dimensions, zones tactiles, masques d'entrée, diagonales, multitouch, vibration et opacité par défaut de 50 % sont conservés.
+
+### Vérification et limites
+- Modification enregistrée sur la branche `v2.3-touch-controls`.
+- La compilation Kotlin/Android et l'assemblage APK doivent être contrôlés par GitHub Actions.
+- Aucun test visuel ni test tactile sur téléphone n'a été réalisé dans cette intervention.
+- Le rendu est une reconstruction native à partir de la maquette ; il ne réutilise aucun pixel extrait de la capture.
