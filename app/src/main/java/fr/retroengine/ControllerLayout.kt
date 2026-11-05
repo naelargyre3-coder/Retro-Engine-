@@ -3,8 +3,8 @@ package fr.retroengine
 import android.graphics.Color
 
 /**
- * Configuration visuelle de la manette NES.
- * Les coordonnées sont normalisées (0..1) et s'adaptent à l'orientation.
+ * Géométrie de la manette NES. Coordonnées normalisées pour s'adapter
+ * aux dimensions de la surface sans agrandir artificiellement les touches.
  */
 data class ControllerButton(
     val label: String,
@@ -26,17 +26,17 @@ object ControllerLayout {
     const val NES_A = 1 shl 8
 
     fun nes(isPortrait: Boolean): List<ControllerButton> {
-        val dpadX = if (isPortrait) 0.22f else 0.16f
-        val dpadY = if (isPortrait) 0.70f else 0.76f
-        val actionX = if (isPortrait) 0.78f else 0.82f
-        val actionY = if (isPortrait) 0.73f else 0.76f
-        val r = if (isPortrait) 0.115f else 0.110f
+        val actionY = if (isPortrait) 0.76f else 0.75f
+        val actionLeft = if (isPortrait) 0.735f else 0.775f
+        val actionRight = if (isPortrait) 0.895f else 0.895f
+        val radius = if (isPortrait) 0.078f else 0.073f
+        val systemY = if (isPortrait) 0.105f else 0.105f
 
         return listOf(
-            ControllerButton("B", NES_B, actionX - 0.115f, actionY, r, Color.rgb(225, 55, 75)),
-            ControllerButton("A", NES_A, actionX + 0.115f, actionY - 0.025f, r, Color.rgb(35, 190, 220)),
-            ControllerButton("SELECT", NES_SELECT, 0.44f, 0.91f, 0.055f, Color.rgb(90, 105, 125)),
-            ControllerButton("START", NES_START, 0.56f, 0.91f, 0.043f, Color.rgb(90, 105, 125))
+            ControllerButton("B", NES_B, actionLeft, actionY, radius, Color.rgb(205, 42, 55)),
+            ControllerButton("A", NES_A, actionRight, actionY, radius, Color.rgb(222, 48, 61)),
+            ControllerButton("SELECT", NES_SELECT, 0.455f, systemY, 0.052f, Color.rgb(65, 69, 78)),
+            ControllerButton("START", NES_START, 0.565f, systemY, 0.052f, Color.rgb(65, 69, 78))
         )
     }
 }
