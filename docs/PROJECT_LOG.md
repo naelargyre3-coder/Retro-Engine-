@@ -630,3 +630,26 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - Modification enregistrée sur `v2.3-touch-controls`.
 - La compilation et les tests automatisés doivent être confirmés par le workflow GitHub Actions.
 - Aucun test visuel sur téléphone n'a été réalisé ici ; la validation finale du rendu reste à faire après installation.
+
+
+## 2026-11-05 — Recréation native des textures NES (sans image copiée)
+
+### Retour utilisateur et correction de méthode
+- L'intégration précédente était incorrecte : elle réutilisait les pixels découpés dans la capture de référence au lieu de recréer les textures.
+- La demande porte sur des touches virtuelles dessinées dans l'application, et non sur la génération d'une image.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+- `app/src/main/res/drawable-nodpi/nes_controller_atlas.webp` (suppression de la ressource copiée)
+- `docs/PROJECT_LOG.md`
+
+### Modifications
+- Suppression de la dépendance à l'atlas bitmap extrait de la capture.
+- Reconstruction native avec Android Canvas et dégradés : croix directionnelle anthracite en relief avec branches séparées et flèches gravées ; boutons A/B rouges bombés avec bague sombre, reflets et libellés ; SELECT/START en capsules gris acier avec biseau et surface satinée.
+- Chaque touche est dessinée indépendamment à l'exécution. Aucun pixel de la capture n'est utilisé comme texture.
+- Géométrie, positions, zones tactiles, entrées, diagonales, multitouch, vibration et opacité restent inchangés.
+
+### Vérification et limites
+- Changement de code préparé pour la branche `v2.3-touch-controls`.
+- La compilation Kotlin/Android et les tests doivent être vérifiés par GitHub Actions après le commit.
+- Aucun rendu sur téléphone n'est revendiqué ; la ressemblance exacte doit être évaluée sur l'appareil après installation.
