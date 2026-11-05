@@ -60,12 +60,23 @@ class VirtualControllerView(
             paint.color = button.color
             paint.alpha = alpha
             paint.style = Paint.Style.FILL
-            canvas.drawCircle(cx, cy, radius, paint)
-            paint.color = android.graphics.Color.WHITE
-            paint.alpha = (alpha * 0.85f).toInt()
+            val buttonRect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+            val corner = radius * 0.42f
+            // Contour clair et face arrondie, plus proches de la maquette.
+            paint.color = 0xFFB9F7FF.toInt()
+            paint.alpha = (alpha * 0.55f).toInt()
             paint.style = Paint.Style.STROKE
-            paint.strokeWidth = (scale * 0.006f).coerceAtLeast(2f)
-            canvas.drawCircle(cx, cy, radius, paint)
+            paint.strokeWidth = (scale * 0.018f).coerceAtLeast(4f)
+            canvas.drawRoundRect(buttonRect, corner, corner, paint)
+            paint.color = button.color
+            paint.alpha = alpha
+            paint.style = Paint.Style.FILL
+            canvas.drawRoundRect(buttonRect, corner, corner, paint)
+            paint.color = android.graphics.Color.WHITE
+            paint.alpha = (alpha * 0.9f).toInt()
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = (scale * 0.007f).coerceAtLeast(2.5f)
+            canvas.drawRoundRect(buttonRect, corner, corner, paint)
             paint.style = Paint.Style.FILL
             paint.textAlign = Paint.Align.CENTER
             paint.textSize = if (button.label.length > 2) radius * 0.42f else radius * 0.85f
@@ -78,8 +89,8 @@ class VirtualControllerView(
     private fun drawDpad(canvas: Canvas, scale: Float, alpha: Int) {
         val cx = (if (isPortrait()) 0.22f else 0.16f) * width
         val cy = (if (isPortrait()) 0.70f else 0.76f) * height
-        val arm = scale * 0.105f
-        val thickness = scale * 0.075f
+        val arm = scale * 0.155f
+        val thickness = scale * 0.105f
         paint.color = 0xFF303844.toInt()
         paint.alpha = alpha
         paint.style = Paint.Style.FILL
@@ -101,7 +112,7 @@ class VirtualControllerView(
         val dx = x - dpadX
         val dy = y - dpadY
         // Zone carrée élargie : les diagonales combinent deux bits directionnels.
-        val reach = scale * 0.15f
+        val reach = scale * 0.195f
         if (abs(dx) <= reach && abs(dy) <= reach) {
             var mask = 0
             if (dx < -reach * 0.22f) mask = mask or ControllerLayout.LEFT
@@ -113,7 +124,7 @@ class VirtualControllerView(
         buttons().forEach { b ->
             val bx = b.x * width
             val by = b.y * height
-            val radius = b.radius * scale * 1.65f
+            val radius = b.radius * scale * 1.55f
             val distance = sqrt((x-bx)*(x-bx) + (y-by)*(y-by))
             if (distance <= radius) return b.inputMask
         }
