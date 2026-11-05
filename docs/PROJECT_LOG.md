@@ -607,3 +607,26 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - Modification enregistrée sur `v2.3-touch-controls`.
 - La compilation doit être vérifiée par GitHub Actions.
 - Le remplacement des dégradés par les textures bitmap directement extraites de la capture reste à réaliser ; la conformité visuelle complète n'est donc pas encore atteinte.
+
+## 2026-11-05 — Intégration des textures bitmap de la maquette NES
+
+### Objectif
+- Remplacer les dégradés dessinés en Kotlin par les images de texture extraites de la capture fournie.
+- Conserver la géométrie des commandes et garder SELECT/START en bas au centre.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+- `app/src/main/res/drawable-nodpi/nes_controller_atlas.webp`
+- `docs/PROJECT_LOG.md`
+
+### Modifications
+- Intégration d'un atlas WebP avec transparence, contenant le D-pad anthracite en relief, les boutons rouges A/B et les capsules métalliques SELECT/START de la maquette.
+- Le rendu utilise directement les régions bitmap d'origine au lieu de reconstruire les matériaux avec des dégradés.
+- L'atlas est embarqué dans les ressources de l'application : aucun téléchargement n'est nécessaire pendant l'émulation.
+- Les coordonnées et dimensions de la disposition sont conservées ; SELECT et START restent à la position basse centrale définie précédemment.
+- Les zones tactiles, masques d'entrée, diagonales, multitouch, vibration et opacité par défaut de 50 % restent inchangés.
+
+### Vérification et limites
+- Modification enregistrée sur `v2.3-touch-controls`.
+- La compilation et les tests automatisés doivent être confirmés par le workflow GitHub Actions.
+- Aucun test visuel sur téléphone n'a été réalisé ici ; la validation finale du rendu reste à faire après installation.
