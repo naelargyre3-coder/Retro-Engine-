@@ -9,6 +9,7 @@ import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.Typeface
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -19,14 +20,14 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * Overlay NES : chaque touche est dessinée nativement en Canvas.
- * Aucun pixel du screenshot de référence n'est utilisé comme texture.
+ * Overlay NES dessiné nativement : matériaux lisses, reflets et biseaux.
+ * Aucun pixel ni atlas bitmap de la maquette n'est réutilisé.
  */
 class VirtualControllerView(
     context: Context,
     private val onInputChanged: (Int) -> Unit
 ) : View(context) {
-    private val paint = Paint(0)
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val pointerMasks = mutableMapOf<Int, Int>()
     private val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
     private val prefs = context.getSharedPreferences("retro_engine_controller", Context.MODE_PRIVATE)
@@ -54,6 +55,36 @@ class VirtualControllerView(
     private fun buttons() = ControllerLayout.nes(isPortrait())
     private fun alpha(base: Int, factor: Float) = (base * factor).toInt().coerceIn(0, 255)
 
+    private fun fill(color: Int, a: Int) {
+        paint.style = Paint.Style.FILL
+        paint.shader = null
+        paint.clearShadowLayer()
+        paint.color = color
+        paint.alpha = a
+        paint.strokeWidth = 1f
+    }
+
+    private fun gradient(
+        bounds: RectF,
+        top: Int,
+        middle: Int,
+        bottom: Int,
+        a: Int
+    ) {
+        paint.style = Paint.Style.FILL
+        paint.clearShadowLayer()
+        paint.shader = LinearGradient(
+            bounds.left, bounds.top, bounds.left, bounds.bottom,
+            intArrayOf(top, middle, bottom), floatArrayOf(0f, 0.52f, 1f), Shader.TileMode.CLAMP
+        )
+        paint.alpha = a
+    }
+
+    private fun rounded(canvas: Canvas, rect: RectF, radius: Float, color: Int, a: Int) {
+        fill(color, a)
+        canvas.drawRoundRect(rect, radius, radius, paint)
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val scale = min(width, height).toFloat()
@@ -75,113 +106,181 @@ class VirtualControllerView(
         paint.alpha = 255
     }
 
-    /** Dessine une pastille en bandes de pixels, sans lissage ni dégradé continu. */
-    private fun drawPixelDisc(canvas: Canvas, cx: Float, cy: Float, radius: Float, baseAlpha: Int) {
-        val cell = (radius / 10f).coerceAtLeast(1f)
-        val widths = intArrayOf(4, 8, 12, 14, 16, 18, 18, 20, 20, 20, 20, 18, 18, 16, 14, 12, 8, 4)
-        widths.forEachIndexed { row, cells ->
-            val y = cy - 9f * cell + row * cell
-            val color = when {
-                row <= 2 -> 0xFFFF777F.toInt()
-                row <= 6 -> 0xFFEF3948.toInt()
-                row <= 11 -> 0xFFD51E32.toInt()
-                else -> 0xFF8D1022.toInt()
-            }
-            paint.style = Paint.Style.FILL
-            paint.shader = null
-            paint.color = color
-            paint.alpha = baseAlpha
-            val half = cells * cell / 2f
-            canvas.drawRect(cx - half, y, cx + half, y + cell, paint)
-        }
-    }
+    /** Bouton A/B rouge bombé, bague acier et reflet spéculaire. */
+    private fun drawActionButton(canvas: Canvas, cx: Float, cy: Float, radius: Float, label: String, a: Int) {
+        val outer = radius * 1.10f
+        val shadow = RectF(cx - outer, cy - outer * 0.88f + radius * 0.13f,
+            cx + outer, cy + outer * 1.02f + radius * 0.13f)
+        fill(Color.BLACK, alpha(a, 0.82f))
+        paint.setShadowLayer(radius * 0.16f, 0f, radius * 0.10f, Color.BLACK)
+        canvas.drawOval(shadow, paint)
+        paint.clearShadowLayer()
 
-    private fun drawPixelRect(canvas: Canvas, left: Float, top: Float, right: Float, bottom: Float, color: Int, baseAlpha: Int) {
+        // Bague extérieure métallique.
+        val ring = RectF(cx - outer, cy - outer, cx + outer, cy + outer)
+        paint.shader = RadialGradient(cx - radius * 0.28f, cy - radius * 0.40f, outer * 1.65f,
+            intArrayOf(0xFFFFFFFF.toInt(), 0xFFBFC7CE.toInt(), 0xFF59636E.toInt(), 0xFF202832.toInt()),
+            floatArrayOf(0f, 0.38f, 0.78f, 1f), Shader.TileMode.CLAMP)
         paint.style = Paint.Style.FILL
+        paint.alpha = a
+        canvas.drawOval(ring, paint)
         paint.shader = null
-        paint.color = color
-        paint.alpha = baseAlpha
-        canvas.drawRect(left, top, right, bottom, paint)
-    }
 
-    /** A/B : boutons rouges brillants en pixels, avec bague et ombre en marches d'escalier. */
-    private fun drawActionButton(canvas: Canvas, cx: Float, cy: Float, radius: Float, label: String, baseAlpha: Int) {
-        val cell = (radius / 10f).coerceAtLeast(1f)
-        drawPixelRect(canvas, cx - radius * 0.82f, cy - radius * 0.72f + cell, cx + radius * 0.82f, cy + radius * 0.92f + cell, 0xFF030509.toInt(), alpha(baseAlpha, 0.98f))
-        drawPixelDisc(canvas, cx, cy, radius * 1.04f, baseAlpha)
-        // Bague sombre et liseré acier en blocs concentriques.
-        drawPixelRect(canvas, cx - radius * 0.70f, cy - radius * 0.78f, cx + radius * 0.70f, cy + radius * 0.78f, 0xFF5C101B.toInt(), baseAlpha)
-        drawPixelRect(canvas, cx - radius * 0.62f, cy - radius * 0.70f, cx + radius * 0.62f, cy + radius * 0.70f, 0xFFDA2638.toInt(), baseAlpha)
-        // Reflets rectangulaires pour conserver le rendu pixel-art.
-        drawPixelRect(canvas, cx - radius * 0.42f, cy - radius * 0.58f, cx + radius * 0.16f, cy - radius * 0.42f, 0xFFFFA0A5.toInt(), alpha(baseAlpha, 0.82f))
-        drawPixelRect(canvas, cx - radius * 0.26f, cy - radius * 0.40f, cx + radius * 0.02f, cy - radius * 0.28f, 0xFFFFD0D2.toInt(), alpha(baseAlpha, 0.68f))
+        val inset = radius * 0.13f
+        val face = RectF(cx - radius * 0.91f, cy - radius * 0.91f,
+            cx + radius * 0.91f, cy + radius * 0.91f)
+        fill(0xFF171B21.toInt(), a)
+        canvas.drawOval(face, paint)
+
+        val red = RectF(cx - radius * 0.80f, cy - radius * 0.80f,
+            cx + radius * 0.80f, cy + radius * 0.80f)
+        paint.shader = RadialGradient(cx - radius * 0.30f, cy - radius * 0.42f, radius * 1.65f,
+            intArrayOf(0xFFFF8A8F.toInt(), 0xFFEF3548.toInt(), 0xFFC71931.toInt(), 0xFF790D20.toInt()),
+            floatArrayOf(0f, 0.34f, 0.76f, 1f), Shader.TileMode.CLAMP)
+        paint.style = Paint.Style.FILL
+        paint.alpha = a
+        canvas.drawOval(red, paint)
+        paint.shader = null
+
+        // Fin liseré intérieur et éclat en haut à gauche.
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = maxOf(1.2f, radius * 0.035f)
+        paint.color = 0xFFFFA0A4.toInt()
+        paint.alpha = alpha(a, 0.72f)
+        canvas.drawArc(red, 205f, 125f, false, paint)
+        paint.style = Paint.Style.FILL
+        val shine = RectF(cx - radius * 0.49f, cy - radius * 0.60f,
+            cx + radius * 0.10f, cy - radius * 0.28f)
+        paint.shader = RadialGradient(shine.centerX(), shine.centerY(), radius * 0.58f,
+            intArrayOf(0xDFFFFFFF.toInt(), 0x55FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        canvas.drawOval(shine, paint)
+        paint.shader = null
+
         paint.textAlign = Paint.Align.CENTER
-        paint.typeface = android.graphics.Typeface.create("monospace", android.graphics.Typeface.BOLD)
-        paint.textSize = radius * 0.76f
-        paint.color = 0xFF5A0C18.toInt()
-        paint.alpha = alpha(baseAlpha, 0.85f)
-        canvas.drawText(label, cx + cell * 0.25f, cy + paint.textSize * 0.35f + cell * 0.35f, paint)
+        paint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        paint.textSize = radius * 0.78f
+        paint.color = 0xFF650D1A.toInt()
+        paint.alpha = alpha(a, 0.78f)
+        canvas.drawText(label, cx + radius * 0.018f, cy + paint.textSize * 0.36f + radius * 0.025f, paint)
         paint.color = Color.WHITE
-        paint.alpha = baseAlpha
-        canvas.drawText(label, cx, cy + paint.textSize * 0.35f, paint)
-        paint.typeface = android.graphics.Typeface.DEFAULT
+        paint.alpha = a
+        canvas.drawText(label, cx, cy + paint.textSize * 0.36f, paint)
+        paint.typeface = Typeface.DEFAULT
     }
 
-    /** SELECT/START : capsules acier à coins en escalier et détails en pixels. */
-    private fun drawSystemButton(canvas: Canvas, cx: Float, cy: Float, radius: Float, label: String, baseAlpha: Int) {
-        val halfW = radius * 1.48f
-        val halfH = radius * 0.55f
-        val step = (radius * 0.16f).coerceAtLeast(2f)
-        val l = cx - halfW
-        val r = cx + halfW
-        val t = cy - halfH
-        val b = cy + halfH
-        drawPixelRect(canvas, l + step, t + step, r - step, b + step * 1.55f, 0xFF05070A.toInt(), alpha(baseAlpha, 0.98f))
-        drawPixelRect(canvas, l, t + step, r, b - step, 0xFF929CA6.toInt(), baseAlpha)
-        drawPixelRect(canvas, l + step, t, r - step, b, 0xFF929CA6.toInt(), baseAlpha)
-        drawPixelRect(canvas, l + step * 1.4f, t + step * 1.4f, r - step * 1.4f, b - step * 1.4f, 0xFF3B4652.toInt(), baseAlpha)
-        drawPixelRect(canvas, l + step * 2f, t + step * 1.8f, r - step * 2f, t + step * 2.6f, 0xFFBFC8D0.toInt(), alpha(baseAlpha, 0.72f))
-        drawPixelRect(canvas, l + step * 2f, b - step * 2.2f, r - step * 2f, b - step * 1.5f, 0xFF202832.toInt(), baseAlpha)
+    /** SELECT/START : capsules gris foncé à double biseau métallique. */
+    private fun drawSystemButton(canvas: Canvas, cx: Float, cy: Float, radius: Float, label: String, a: Int) {
+        val halfW = radius * 1.62f
+        val halfH = radius * 0.57f
+        val outer = RectF(cx - halfW, cy - halfH, cx + halfW, cy + halfH)
+        fill(Color.BLACK, alpha(a, 0.88f))
+        paint.setShadowLayer(radius * 0.16f, 0f, radius * 0.10f, Color.BLACK)
+        canvas.drawRoundRect(RectF(outer).apply { offset(0f, radius * 0.12f) },
+            halfH, halfH, paint)
+        paint.clearShadowLayer()
+
+        gradient(outer, 0xFFF1F4F6.toInt(), 0xFF7D8995.toInt(), 0xFF252D37.toInt(), a)
+        canvas.drawRoundRect(outer, halfH, halfH, paint)
+        paint.shader = null
+
+        val inner = RectF(outer).apply { inset(radius * 0.095f, radius * 0.095f) }
+        gradient(inner, 0xFF687481.toInt(), 0xFF303A46.toInt(), 0xFF111820.toInt(), a)
+        canvas.drawRoundRect(inner, halfH * 0.78f, halfH * 0.78f, paint)
+        paint.shader = null
+
+        val face = RectF(inner).apply { inset(radius * 0.055f, radius * 0.045f) }
+        gradient(face, 0xFF515D69.toInt(), 0xFF303A45.toInt(), 0xFF202832.toInt(), a)
+        canvas.drawRoundRect(face, halfH * 0.70f, halfH * 0.70f, paint)
+        paint.shader = null
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = maxOf(1f, radius * 0.025f)
+        paint.color = 0xFFDCE2E8.toInt()
+        paint.alpha = alpha(a, 0.66f)
+        canvas.drawRoundRect(RectF(face).apply { inset(radius * 0.035f, radius * 0.035f) },
+            halfH * 0.60f, halfH * 0.60f, paint)
+        paint.style = Paint.Style.FILL
+
         paint.textAlign = Paint.Align.CENTER
-        paint.typeface = android.graphics.Typeface.create("monospace", android.graphics.Typeface.BOLD)
-        paint.textSize = radius * 0.42f
-        paint.color = 0xFFE6EBF0.toInt()
-        paint.alpha = baseAlpha
-        canvas.drawText(label, cx, cy + paint.textSize * 0.35f, paint)
-        paint.typeface = android.graphics.Typeface.DEFAULT
+        paint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        paint.textSize = radius * 0.39f
+        paint.color = 0xFF080D13.toInt()
+        paint.alpha = alpha(a, 0.9f)
+        canvas.drawText(label, cx, cy + paint.textSize * 0.37f + radius * 0.025f, paint)
+        paint.color = 0xFFF1F4F7.toInt()
+        paint.alpha = a
+        canvas.drawText(label, cx, cy + paint.textSize * 0.37f, paint)
+        paint.typeface = Typeface.DEFAULT
     }
 
-    /** Croix directionnelle anthracite : croix en blocs, biseaux carrés et flèches pixelisées. */
-    private fun drawDpad(canvas: Canvas, scale: Float, baseAlpha: Int) {
+    /** Croix directionnelle grise en relief, avec branches arrondies et centre circulaire. */
+    private fun drawDpad(canvas: Canvas, scale: Float, a: Int) {
         val cx = (if (isPortrait()) 0.22f else 0.16f) * width
         val cy = (if (isPortrait()) 0.70f else 0.75f) * height
         val arm = scale * 0.145f
         val half = scale * 0.052f
-        val cell = (scale * 0.012f).coerceAtLeast(1f)
-        // Ombre décalée, puis croix principale composée de rectangles.
-        drawPixelRect(canvas, cx - half, cy - arm + cell, cx + half, cy + arm + cell, 0xFF03060A.toInt(), alpha(baseAlpha, 0.95f))
-        drawPixelRect(canvas, cx - arm, cy - half + cell, cx + arm, cy + half + cell, 0xFF03060A.toInt(), alpha(baseAlpha, 0.95f))
-        drawPixelRect(canvas, cx - half, cy - arm, cx + half, cy + arm, 0xFF46515E.toInt(), baseAlpha)
-        drawPixelRect(canvas, cx - arm, cy - half, cx + arm, cy + half, 0xFF46515E.toInt(), baseAlpha)
-        // Faces éclairées en haut et à gauche, faces sombres en bas et à droite.
-        drawPixelRect(canvas, cx - half + cell, cy - arm + cell, cx + half - cell, cy - half, 0xFF778391.toInt(), baseAlpha)
-        drawPixelRect(canvas, cx - arm + cell, cy - half + cell, cx - half, cy + half - cell, 0xFF687584.toInt(), baseAlpha)
-        drawPixelRect(canvas, cx - half + cell, cy + half, cx + half - cell, cy + arm - cell, 0xFF202A35.toInt(), baseAlpha)
-        drawPixelRect(canvas, cx + half, cy - half + cell, cx + arm - cell, cy + half - cell, 0xFF1B232D.toInt(), baseAlpha)
-        // Quatre flèches courtes dessinées en marches carrées.
-        val a = cell * 1.35f
-        val tip = cell * 3f
-        drawPixelRect(canvas, cx - a, cy - arm * 0.78f, cx + a, cy - arm * 0.48f, 0xFFC4CED8.toInt(), alpha(baseAlpha, 0.78f))
-        drawPixelRect(canvas, cx - tip, cy - arm * 0.55f, cx + tip, cy - arm * 0.43f, 0xFFC4CED8.toInt(), alpha(baseAlpha, 0.78f))
-        drawPixelRect(canvas, cx - a, cy + arm * 0.48f, cx + a, cy + arm * 0.78f, 0xFFC4CED8.toInt(), alpha(baseAlpha, 0.78f))
-        drawPixelRect(canvas, cx - tip, cy + arm * 0.43f, cx + tip, cy + arm * 0.55f, 0xFFC4CED8.toInt(), alpha(baseAlpha, 0.78f))
-        drawPixelRect(canvas, cx - arm * 0.78f, cy - a, cx - arm * 0.48f, cy + a, 0xFFC4CED8.toInt(), alpha(baseAlpha, 0.78f))
-        drawPixelRect(canvas, cx - arm * 0.55f, cy - tip, cx - arm * 0.43f, cy + tip, 0xFFC4CED8.toInt(), alpha(baseAlpha, 0.78f))
-        drawPixelRect(canvas, cx + arm * 0.48f, cy - a, cx + arm * 0.78f, cy + a, 0xFFC4CED8.toInt(), alpha(baseAlpha, 0.78f))
-        drawPixelRect(canvas, cx + arm * 0.43f, cy - tip, cx + arm * 0.55f, cy + tip, 0xFFC4CED8.toInt(), alpha(baseAlpha, 0.78f))
-        // Séparation centrale discrète.
-        drawPixelRect(canvas, cx - half + cell, cy - cell * 0.5f, cx + half - cell, cy + cell * 0.5f, 0xFF111923.toInt(), alpha(baseAlpha, 0.7f))
-        drawPixelRect(canvas, cx - cell * 0.5f, cy - half + cell, cx + cell * 0.5f, cy + half - cell, 0xFF111923.toInt(), alpha(baseAlpha, 0.7f))
+        val radius = half * 0.34f
+
+        val shadow = Path().apply {
+            addRoundRect(RectF(cx - half, cy - arm, cx + half, cy + arm), radius, radius, Path.Direction.CW)
+            addRoundRect(RectF(cx - arm, cy - half, cx + arm, cy + half), radius, radius, Path.Direction.CW)
+        }
+        fill(0xFF05080C.toInt(), alpha(a, 0.95f))
+        paint.setShadowLayer(scale * 0.018f, 0f, scale * 0.012f, Color.BLACK)
+        canvas.save()
+        canvas.translate(0f, scale * 0.012f)
+        canvas.drawPath(shadow, paint)
+        canvas.restore()
+        paint.clearShadowLayer()
+
+        // Corps acier sombre.
+        fill(0xFF26313D.toInt(), a)
+        canvas.drawPath(shadow, paint)
+
+        // Dégradés de lumière séparés sur les quatre branches.
+        val up = RectF(cx - half * 0.82f, cy - arm * 0.96f, cx + half * 0.82f, cy + half * 0.10f)
+        gradient(up, 0xFFB5C0CA.toInt(), 0xFF667381.toInt(), 0xFF303B47.toInt(), a)
+        canvas.drawRoundRect(up, radius, radius, paint)
+        val down = RectF(cx - half * 0.82f, cy - half * 0.08f, cx + half * 0.82f, cy + arm * 0.96f)
+        gradient(down, 0xFF566270.toInt(), 0xFF35414E.toInt(), 0xFF151D27.toInt(), a)
+        canvas.drawRoundRect(down, radius, radius, paint)
+        val left = RectF(cx - arm * 0.96f, cy - half * 0.82f, cx + half * 0.10f, cy + half * 0.82f)
+        gradient(left, 0xFFAAB5C0.toInt(), 0xFF64717F.toInt(), 0xFF303B47.toInt(), a)
+        canvas.drawRoundRect(left, radius, radius, paint)
+        val right = RectF(cx - half * 0.10f, cy - half * 0.82f, cx + arm * 0.96f, cy + half * 0.82f)
+        gradient(right, 0xFF566270.toInt(), 0xFF35414E.toInt(), 0xFF151D27.toInt(), a)
+        canvas.drawRoundRect(right, radius, radius, paint)
+        paint.shader = null
+
+        // Moyeu central sombre, légèrement bombé.
+        val hub = RectF(cx - half * 0.80f, cy - half * 0.80f, cx + half * 0.80f, cy + half * 0.80f)
+        paint.shader = RadialGradient(cx - half * 0.22f, cy - half * 0.28f, half * 1.55f,
+            intArrayOf(0xFF687583.toInt(), 0xFF303B47.toInt(), 0xFF151D26.toInt()),
+            null, Shader.TileMode.CLAMP)
+        paint.alpha = a
+        canvas.drawOval(hub, paint)
+        paint.shader = null
+
+        // Flèches gravées, discrètes et centrées sur les bras.
+        val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFDCE3E9.toInt()
+            alpha = alpha(a, 0.78f)
+            style = Paint.Style.FILL
+        }
+        val arrow = scale * 0.018f
+        fun triangle(points: FloatArray) {
+            val path = Path().apply {
+                moveTo(points[0], points[1])
+                lineTo(points[2], points[3])
+                lineTo(points[4], points[5])
+                close()
+            }
+            canvas.drawPath(path, arrowPaint)
+        }
+        triangle(floatArrayOf(cx, cy - arm * 0.77f, cx - arrow, cy - arm * 0.58f, cx + arrow, cy - arm * 0.58f))
+        triangle(floatArrayOf(cx, cy + arm * 0.77f, cx - arrow, cy + arm * 0.58f, cx + arrow, cy + arm * 0.58f))
+        triangle(floatArrayOf(cx - arm * 0.77f, cy, cx - arm * 0.58f, cy - arrow, cx - arm * 0.58f, cy + arrow))
+        triangle(floatArrayOf(cx + arm * 0.77f, cy, cx + arm * 0.58f, cy - arrow, cx + arm * 0.58f, cy + arrow))
     }
 
     private fun hitTest(x: Float, y: Float): Int {
