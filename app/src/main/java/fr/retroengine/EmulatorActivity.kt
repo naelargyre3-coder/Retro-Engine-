@@ -81,94 +81,13 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         surfaceView.holder.addCallback(this)
         root.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
 
-        // Barre supérieure épurée : uniquement SELECT et START, centrés.
-        val topBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(dp(8), dp(4), dp(8), dp(4))
-            setBackgroundColor(Color.TRANSPARENT)
+        // L'overlay transparent reste au-dessus de la vidéo sans réduire sa surface.
+        val controller = VirtualControllerView(this) { mask ->
+            touchInputMask = mask
+            publishInputMask()
         }
-        addControl(topBar, "SELECT", SELECT, 76, 42)
-        addControl(topBar, "START", START, 76, 42)
-        root.addView(topBar, FrameLayout.LayoutParams(-1, dp(52), Gravity.TOP))
-
-        val controls = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(18), dp(6), dp(18), dp(6))
-            setBackgroundColor(Color.TRANSPARENT)
-        }
-
-        // Croix directionnelle symétrique : les quatre directions ont exactement
-        // les mêmes dimensions et des zones tactiles identiques.
-        val dpad = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-        }
-        val dpadTop = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        addControl(dpadTop, "▲", UP, 50, 50)
-        dpad.addView(dpadTop)
-
-        val dpadMiddle = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        addControl(dpadMiddle, "◀", LEFT, 50, 50)
-        dpadMiddle.addView(View(this), LinearLayout.LayoutParams(dp(54), dp(54)))
-        addControl(dpadMiddle, "▶", RIGHT, 50, 50)
-        dpad.addView(dpadMiddle)
-
-        val dpadBottom = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        addControl(dpadBottom, "▼", DOWN, 50, 50)
-        dpad.addView(dpadBottom)
-        controls.addView(dpad, LinearLayout.LayoutParams(dp(162), dp(162)))
-
-        controls.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-
-        // Commandes d'action NES uniquement : B et A, de taille identique.
-        val actionButtons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        addControl(actionButtons, "B", B, 58, 58)
-        addControl(actionButtons, "A", A, 58, 58)
-        controls.addView(actionButtons)
-        root.addView(controls, FrameLayout.LayoutParams(-1, dp(180), Gravity.BOTTOM))
+        root.addView(controller, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
-    }
-
-    private fun addControl(
-        parent: LinearLayout,
-        label: String,
-        bit: Int,
-        widthDp: Int,
-        heightDp: Int
-    ) {
-        val button = TextView(this).apply {
-            text = label
-            gravity = Gravity.CENTER
-            textSize = if (label.length > 1) 10f else 19f
-            setTextColor(Color.WHITE)
-            setBackgroundColor(0xCC26384A.toInt())
-            isClickable = true
-            isFocusable = true
-            setOnTouchListener { _, event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN -> updateInput(bit, true)
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> updateInput(bit, false)
-                }
-                true
-            }
-        }
-        parent.addView(button, LinearLayout.LayoutParams(dp(widthDp), dp(heightDp)).apply {
-            setMargins(dp(2), dp(2), dp(2), dp(2))
-        })
     }
 
     private fun updateInput(bit: Int, pressed: Boolean) {
