@@ -653,3 +653,25 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - Changement de code préparé pour la branche `v2.3-touch-controls`.
 - La compilation Kotlin/Android et les tests doivent être vérifiés par GitHub Actions après le commit.
 - Aucun rendu sur téléphone n'est revendiqué ; la ressemblance exacte doit être évaluée sur l'appareil après installation.
+
+
+## 2026-11-05 — Passage des touches NES en pixel-art natif
+
+### Objectif
+- Appliquer le style pixel-art demandé pour toutes les commandes virtuelles NES, sans reprendre de pixels d'une capture ou d'une image externe.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+- `docs/PROJECT_LOG.md`
+
+### Modifications
+- Remplacement des dégradés continus et des contours lissés par des formes en blocs et des bandes de couleurs à bords francs.
+- Croix directionnelle anthracite reconstruite en rectangles pixelisés, avec relief clair/sombre et repères directionnels carrés.
+- Boutons A/B rouges en marches d'escalier, avec reflets rectangulaires et lettrage monospace.
+- SELECT/START gris acier avec coins en escalier, liserés rectangulaires et lettrage monospace.
+- Aucun changement apporté aux positions, dimensions, zones tactiles, diagonales, multitouch, vibration ou opacité.
+
+### Vérification et limites
+- Code enregistré sur la branche `v2.3-touch-controls`.
+- Le workflow GitHub Actions doit confirmer la compilation Kotlin/Android et l'assemblage APK.
+- Aucun aperçu de l'APK ni test sur téléphone n'est disponible à cette étape ; le rendu pixel-art final reste à valider sur appareil.
