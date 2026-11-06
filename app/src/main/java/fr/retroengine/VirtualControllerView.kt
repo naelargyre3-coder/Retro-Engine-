@@ -281,6 +281,7 @@ class VirtualControllerView(
         triangle(floatArrayOf(cx, cy + arm * 0.77f, cx - arrow, cy + arm * 0.58f, cx + arrow, cy + arm * 0.58f))
         triangle(floatArrayOf(cx - arm * 0.77f, cy, cx - arm * 0.58f, cy - arrow, cx - arm * 0.58f, cy + arrow))
         triangle(floatArrayOf(cx + arm * 0.77f, cy, cx + arm * 0.58f, cy - arrow, cx + arm * 0.58f, cy + arrow))
+        canvas.restore()
     }
 
     private fun hitTest(x: Float, y: Float): Int {
@@ -289,11 +290,12 @@ class VirtualControllerView(
         val dpadY = (if (isPortrait()) 0.70f else 0.67f) * height
         val dx = x - dpadX
         val dy = y - dpadY
-        val reach = scale * 0.19f
-        if (abs(dx) <= reach && abs(dy) <= reach) {
+        val reach = scale * (if (isPortrait()) 0.19f else 0.25f)
+        val horizontalReach = reach * if (isPortrait()) 1f else (width.toFloat() / height) / (530f / 290f)
+        if (abs(dx) <= horizontalReach && abs(dy) <= reach) {
             var mask = 0
-            if (dx < -reach * 0.22f) mask = mask or ControllerLayout.LEFT
-            if (dx > reach * 0.22f) mask = mask or ControllerLayout.RIGHT
+            if (dx < -horizontalReach * 0.22f) mask = mask or ControllerLayout.LEFT
+            if (dx > horizontalReach * 0.22f) mask = mask or ControllerLayout.RIGHT
             if (dy < -reach * 0.22f) mask = mask or ControllerLayout.UP
             if (dy > reach * 0.22f) mask = mask or ControllerLayout.DOWN
             return mask
