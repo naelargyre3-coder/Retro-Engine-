@@ -220,6 +220,9 @@ class VirtualControllerView(
         val arm = scale * (if (isPortrait()) 0.145f else 0.224f)
         val half = scale * (if (isPortrait()) 0.052f else 0.078f)
         val radius = half * 0.34f
+        val horizontalScale = if (isPortrait()) 1f else (width.toFloat() / height) / (530f / 290f)
+        canvas.save()
+        canvas.scale(horizontalScale, 1f, cx, cy)
 
         val shadow = Path().apply {
             addRoundRect(RectF(cx - half, cy - arm, cx + half, cy + arm), radius, radius, Path.Direction.CW)
