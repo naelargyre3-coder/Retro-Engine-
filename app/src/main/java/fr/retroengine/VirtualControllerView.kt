@@ -171,7 +171,7 @@ class VirtualControllerView(
     /** SELECT/START : capsules gris foncé à double biseau métallique. */
     private fun drawSystemButton(canvas: Canvas, cx: Float, cy: Float, radius: Float, label: String, a: Int) {
         val halfW = radius * 1.62f
-        val halfH = radius * 0.57f
+        val halfH = radius * 0.70f
         val outer = RectF(cx - halfW, cy - halfH, cx + halfW, cy + halfH)
         fill(Color.BLACK, alpha(a, 0.88f))
         paint.setShadowLayer(radius * 0.16f, 0f, radius * 0.10f, Color.BLACK)
@@ -203,7 +203,7 @@ class VirtualControllerView(
 
         paint.textAlign = Paint.Align.CENTER
         paint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        paint.textSize = radius * 0.39f
+        paint.textSize = radius * 0.34f
         paint.color = 0xFF080D13.toInt()
         paint.alpha = alpha(a, 0.9f)
         canvas.drawText(label, cx, cy + paint.textSize * 0.37f + radius * 0.025f, paint)
