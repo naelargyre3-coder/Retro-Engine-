@@ -731,3 +731,28 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 ### Complément de recalage
 - Le D-pad est étiré horizontalement selon le rapport du panneau de référence (530 × 290) et celui de l'écran paysage, tout en conservant des branches visuellement équilibrées.
 - La zone de détection directionnelle a été élargie pour couvrir le nouveau dessin ; elle reste indépendante du rendu.
+
+
+## 2026-11-06 — Refonte du dessin de la manette NES selon la maquette
+
+### Retour utilisateur
+- Le rendu précédent ne correspondait toujours pas à la maquette : l'augmentation des commandes ne corrigeait pas leur apparence.
+- La priorité est donc la géométrie des matériaux et le style du D-pad, des boutons et des capsules, et non un nouvel agrandissement.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+- `app/src/main/java/fr/retroengine/ControllerLayout.kt`
+- `docs/PROJECT_LOG.md`
+
+### Modifications enregistrées
+- Reconstruction du D-pad en une silhouette unique en croix, avec union des branches : suppression des raccords visuels entre quatre éléments séparés.
+- Remplacement des grandes flèches visibles par un relief métallique continu, un biseau discret et un moyeu central graphite.
+- Conservation des proportions du D-pad et de sa position normalisée ; suppression de la déformation horizontale artificielle.
+- Reprise des dimensions des boutons A/B et réduction indépendante des capsules SELECT/START en paysage pour retrouver les proportions du panneau de référence.
+- Conservation des positions normalisées, des masques d'entrée, du traitement multitouch et de la logique de vibration.
+
+### Vérification et limites
+- Modifications source enregistrées sur la branche `v2.3-touch-controls`.
+- Le rendu est une reconstruction Canvas native ; aucun pixel de capture n'est utilisé.
+- La compilation Kotlin/Android, les tests et la génération de l'APK ne sont pas encore confirmés par GitHub Actions.
+- Aucun test visuel sur téléphone n'a été effectué après cette refonte ; la comparaison finale doit être faite sur une capture de la nouvelle APK.
