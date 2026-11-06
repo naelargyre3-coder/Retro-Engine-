@@ -37,7 +37,7 @@ object ControllerLayout {
             ControllerButton("B", NES_B, actionLeft, actionY, actionRadius, Color.rgb(205, 42, 55)),
             ControllerButton("A", NES_A, actionRight, actionY, actionRadius, Color.rgb(222, 48, 61)),
             ControllerButton("SELECT", NES_SELECT, if (isPortrait) 0.455f else 0.445f, systemY, systemRadius, Color.rgb(65, 69, 78)),
-            ControllerButton("START", NES_START, if (isPortrait) 0.565f else 0.635f, systemY, if (isPortrait) 0.052f else 0.117f, Color.rgb(65, 69, 78))
+            ControllerButton("START", NES_START, if (isPortrait) 0.565f else 0.635f, systemY, systemRadius, Color.rgb(65, 69, 78))
         )
     }
 }
