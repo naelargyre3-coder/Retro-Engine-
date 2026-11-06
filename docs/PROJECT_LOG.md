@@ -756,3 +756,9 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - Le rendu est une reconstruction Canvas native ; aucun pixel de capture n'est utilisé.
 - La compilation Kotlin/Android, les tests et la génération de l'APK ne sont pas encore confirmés par GitHub Actions.
 - Aucun test visuel sur téléphone n'a été effectué après cette refonte ; la comparaison finale doit être faite sur une capture de la nouvelle APK.
+
+
+### Ajustement complémentaire des capsules
+- Correction de la hauteur des capsules SELECT/START indépendamment de leur largeur, afin de retrouver leur silhouette basse et allongée de la maquette.
+- Réduction de la taille du lettrage pour éviter que les libellés prennent trop de place dans les capsules.
+- Cette retouche est enregistrée ; elle doit être incluse dans la validation CI du dernier commit.
