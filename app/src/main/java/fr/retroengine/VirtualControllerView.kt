@@ -213,78 +213,82 @@ class VirtualControllerView(
         paint.typeface = Typeface.DEFAULT
     }
 
-    /** Croix directionnelle grise en relief, avec branches arrondies et centre circulaire. */
+    /** Croix directionnelle NES : silhouette continue, biseau acier et moyeu central. */
     private fun drawDpad(canvas: Canvas, scale: Float, a: Int) {
         val cx = 0.22f * width
         val cy = (if (isPortrait()) 0.70f else 0.67f) * height
         val arm = scale * (if (isPortrait()) 0.145f else 0.224f)
         val half = scale * (if (isPortrait()) 0.052f else 0.078f)
-        val radius = half * 0.34f
-        val horizontalScale = if (isPortrait()) 1f else (width.toFloat() / height) / (530f / 290f)
-        canvas.save()
-        canvas.scale(horizontalScale, 1f, cx, cy)
+        val corner = half * 0.27f
 
-        val shadow = Path().apply {
-            addRoundRect(RectF(cx - half, cy - arm, cx + half, cy + arm), radius, radius, Path.Direction.CW)
-            addRoundRect(RectF(cx - arm, cy - half, cx + arm, cy + half), radius, radius, Path.Direction.CW)
+        // Une seule forme en croix : les quatre branches ne se chevauchent plus visuellement.
+        val cross = Path().apply {
+            addRoundRect(RectF(cx - half, cy - arm, cx + half, cy + arm),
+                corner, corner, Path.Direction.CW)
+            val horizontal = Path().apply {
+                addRoundRect(RectF(cx - arm, cy - half, cx + arm, cy + half),
+                    corner, corner, Path.Direction.CW)
+            }
+            op(horizontal, Path.Op.UNION)
         }
-        fill(0xFF05080C.toInt(), alpha(a, 0.95f))
+        val bounds = RectF(cx - arm, cy - arm, cx + arm, cy + arm)
+
+        // Ombre portée et coque sombre sous le métal.
+        fill(0xFF080D13.toInt(), alpha(a, 0.95f))
         paint.setShadowLayer(scale * 0.018f, 0f, scale * 0.012f, Color.BLACK)
         canvas.save()
         canvas.translate(0f, scale * 0.012f)
-        canvas.drawPath(shadow, paint)
+        canvas.drawPath(cross, paint)
         canvas.restore()
         paint.clearShadowLayer()
 
-        // Corps acier sombre.
-        fill(0xFF26313D.toInt(), a)
-        canvas.drawPath(shadow, paint)
-
-        // Dégradés de lumière séparés sur les quatre branches.
-        val up = RectF(cx - half * 0.82f, cy - arm * 0.96f, cx + half * 0.82f, cy + half * 0.10f)
-        gradient(up, 0xFFB5C0CA.toInt(), 0xFF667381.toInt(), 0xFF303B47.toInt(), a)
-        canvas.drawRoundRect(up, radius, radius, paint)
-        val down = RectF(cx - half * 0.82f, cy - half * 0.08f, cx + half * 0.82f, cy + arm * 0.96f)
-        gradient(down, 0xFF566270.toInt(), 0xFF35414E.toInt(), 0xFF151D27.toInt(), a)
-        canvas.drawRoundRect(down, radius, radius, paint)
-        val left = RectF(cx - arm * 0.96f, cy - half * 0.82f, cx + half * 0.10f, cy + half * 0.82f)
-        gradient(left, 0xFFAAB5C0.toInt(), 0xFF64717F.toInt(), 0xFF303B47.toInt(), a)
-        canvas.drawRoundRect(left, radius, radius, paint)
-        val right = RectF(cx - half * 0.10f, cy - half * 0.82f, cx + arm * 0.96f, cy + half * 0.82f)
-        gradient(right, 0xFF566270.toInt(), 0xFF35414E.toInt(), 0xFF151D27.toInt(), a)
-        canvas.drawRoundRect(right, radius, radius, paint)
+        // Liseré extérieur acier, puis face métallique continue.
+        paint.style = Paint.Style.STROKE
+        paint.strokeJoin = Paint.Join.ROUND
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.strokeWidth = maxOf(2f, half * 0.20f)
+        paint.shader = LinearGradient(bounds.left, bounds.top, bounds.right, bounds.bottom,
+            intArrayOf(0xFFE5EBF0.toInt(), 0xFF8794A1.toInt(), 0xFF34404D.toInt()),
+            floatArrayOf(0f, 0.52f, 1f), Shader.TileMode.CLAMP)
+        paint.alpha = a
+        canvas.drawPath(cross, paint)
         paint.shader = null
 
-        // Moyeu central sombre, légèrement bombé.
-        val hub = RectF(cx - half * 0.80f, cy - half * 0.80f, cx + half * 0.80f, cy + half * 0.80f)
-        paint.shader = RadialGradient(cx - half * 0.22f, cy - half * 0.28f, half * 1.55f,
-            intArrayOf(0xFF687583.toInt(), 0xFF303B47.toInt(), 0xFF151D26.toInt()),
-            null, Shader.TileMode.CLAMP)
+        paint.style = Paint.Style.FILL
+        paint.shader = LinearGradient(cx - half, cy - arm, cx + half, cy + arm,
+            intArrayOf(0xFFBFC9D2.toInt(), 0xFF758391.toInt(), 0xFF35414D.toInt(), 0xFF202A35.toInt()),
+            floatArrayOf(0f, 0.28f, 0.70f, 1f), Shader.TileMode.CLAMP)
+        paint.alpha = a
+        canvas.drawPath(cross, paint)
+        paint.shader = null
+
+        // Reflet supérieur discret : il suggère le biseau sans créer de grandes flèches.
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = maxOf(1.4f, half * 0.055f)
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.color = 0xFFE5ECF2.toInt()
+        paint.alpha = alpha(a, 0.52f)
+        canvas.drawLine(cx - half * 0.48f, cy - arm * 0.80f,
+            cx + half * 0.48f, cy - arm * 0.80f, paint)
+        canvas.drawLine(cx - arm * 0.80f, cy - half * 0.48f,
+            cx - arm * 0.80f, cy + half * 0.48f, paint)
+        paint.style = Paint.Style.FILL
+
+        // Moyeu central noir/graphite, légèrement bombé.
+        val hubR = half * 0.70f
+        val hub = RectF(cx - hubR, cy - hubR, cx + hubR, cy + hubR)
+        paint.shader = RadialGradient(cx - hubR * 0.28f, cy - hubR * 0.36f, hubR * 1.65f,
+            intArrayOf(0xFF697684.toInt(), 0xFF303B47.toInt(), 0xFF101720.toInt()),
+            floatArrayOf(0f, 0.62f, 1f), Shader.TileMode.CLAMP)
         paint.alpha = a
         canvas.drawOval(hub, paint)
         paint.shader = null
-
-        // Flèches gravées, discrètes et centrées sur les bras.
-        val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF202A34.toInt()
-            alpha = alpha(a, 0.62f)
-            style = Paint.Style.FILL
-        }
-        val arrow = scale * (if (isPortrait()) 0.018f else 0.022f)
-        fun triangle(points: FloatArray) {
-            val path = Path().apply {
-                moveTo(points[0], points[1])
-                lineTo(points[2], points[3])
-                lineTo(points[4], points[5])
-                close()
-            }
-            canvas.drawPath(path, arrowPaint)
-        }
-        triangle(floatArrayOf(cx, cy - arm * 0.77f, cx - arrow, cy - arm * 0.58f, cx + arrow, cy - arm * 0.58f))
-        triangle(floatArrayOf(cx, cy + arm * 0.77f, cx - arrow, cy + arm * 0.58f, cx + arrow, cy + arm * 0.58f))
-        triangle(floatArrayOf(cx - arm * 0.77f, cy, cx - arm * 0.58f, cy - arrow, cx - arm * 0.58f, cy + arrow))
-        triangle(floatArrayOf(cx + arm * 0.77f, cy, cx + arm * 0.58f, cy - arrow, cx + arm * 0.58f, cy + arrow))
-        canvas.restore()
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = maxOf(1f, half * 0.035f)
+        paint.color = 0xFFB8C2CC.toInt()
+        paint.alpha = alpha(a, 0.36f)
+        canvas.drawOval(hub, paint)
+        paint.style = Paint.Style.FILL
     }
 
     private fun hitTest(x: Float, y: Float): Int {
