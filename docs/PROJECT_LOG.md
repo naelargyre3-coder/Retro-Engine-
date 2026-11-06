@@ -700,3 +700,29 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - La compilation Kotlin/Android et l'assemblage APK doivent être contrôlés par GitHub Actions.
 - Aucun test visuel ni test tactile sur téléphone n'a été réalisé dans cette intervention.
 - Le rendu est une reconstruction native à partir de la maquette ; il ne réutilise aucun pixel extrait de la capture.
+
+
+
+## 2026-11-06 — Recalage géométrique de l'overlay NES sur la maquette
+
+### Retour utilisateur et référence
+- La capture de l'APK confirme un écart majeur avec le panneau NES de `retro_engine_maquette_v2.png`.
+- La comparaison porte sur les proportions et les coordonnées relatives au panneau complet, pas uniquement sur la couleur ou les effets.
+
+### Fichiers modifiés
+- `app/src/main/java/fr/retroengine/ControllerLayout.kt`
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+- `docs/PROJECT_LOG.md`
+
+### Corrections apportées
+- En paysage, repositionnement du D-pad à 22 % de la largeur et 67 % de la hauteur, conformément à la maquette.
+- Recalage des boutons B et A à 77,7 % et 92,8 % de la largeur, et à 73 % de la hauteur.
+- Repositionnement de SELECT/START à 44,5 % et 63,5 % de la largeur, en bas à 94,5 % de la hauteur.
+- Révision des dimensions de dessin en paysage pour retrouver l'échelle relative du panneau de référence ; les réglages portrait sont conservés.
+- Remplacement des repères directionnels trop clairs par des repères sombres et discrets, plus proches des creux de la maquette.
+- Les masques d'entrée, zones tactiles, diagonales, multitouch, vibration et opacité par défaut restent inchangés.
+
+### Vérification et limites
+- Modification du code enregistrée sur la branche de test ; la compilation CI doit encore être vérifiée.
+- Aucun test visuel sur appareil n'a été effectué après cette modification.
+- La fidélité finale des matériaux et du rendu à 50 % d'opacité devra être contrôlée sur la prochaine capture de l'APK.
