@@ -26,17 +26,17 @@ object ControllerLayout {
     const val NES_A = 1 shl 8
 
     fun nes(isPortrait: Boolean): List<ControllerButton> {
-        val actionY = if (isPortrait) 0.76f else 0.75f
-        val actionLeft = if (isPortrait) 0.735f else 0.775f
-        val actionRight = if (isPortrait) 0.895f else 0.895f
-        val radius = if (isPortrait) 0.078f else 0.073f
-        val systemY = if (isPortrait) 0.91f else 0.91f
+        val actionY = if (isPortrait) 0.76f else 0.73f
+        val actionLeft = if (isPortrait) 0.735f else 0.777f
+        val actionRight = if (isPortrait) 0.895f else 0.928f
+        val radius = if (isPortrait) 0.078f else 0.117f
+        val systemY = if (isPortrait) 0.91f else 0.945f
 
         return listOf(
             ControllerButton("B", NES_B, actionLeft, actionY, radius, Color.rgb(205, 42, 55)),
             ControllerButton("A", NES_A, actionRight, actionY, radius, Color.rgb(222, 48, 61)),
-            ControllerButton("SELECT", NES_SELECT, 0.455f, systemY, 0.052f, Color.rgb(65, 69, 78)),
-            ControllerButton("START", NES_START, 0.565f, systemY, 0.052f, Color.rgb(65, 69, 78))
+            ControllerButton("SELECT", NES_SELECT, if (isPortrait) 0.455f else 0.445f, systemY, if (isPortrait) 0.052f else 0.117f, Color.rgb(65, 69, 78)),
+            ControllerButton("START", NES_START, if (isPortrait) 0.565f else 0.635f, systemY, if (isPortrait) 0.052f else 0.117f, Color.rgb(65, 69, 78))
         )
     }
 }
