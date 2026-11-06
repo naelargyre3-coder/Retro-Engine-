@@ -215,10 +215,10 @@ class VirtualControllerView(
 
     /** Croix directionnelle grise en relief, avec branches arrondies et centre circulaire. */
     private fun drawDpad(canvas: Canvas, scale: Float, a: Int) {
-        val cx = (if (isPortrait()) 0.22f else 0.16f) * width
-        val cy = (if (isPortrait()) 0.70f else 0.75f) * height
-        val arm = scale * 0.145f
-        val half = scale * 0.052f
+        val cx = 0.22f * width
+        val cy = (if (isPortrait()) 0.70f else 0.67f) * height
+        val arm = scale * (if (isPortrait()) 0.145f else 0.224f)
+        val half = scale * (if (isPortrait()) 0.052f else 0.078f)
         val radius = half * 0.34f
 
         val shadow = Path().apply {
@@ -263,11 +263,11 @@ class VirtualControllerView(
 
         // Flèches gravées, discrètes et centrées sur les bras.
         val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFDCE3E9.toInt()
-            alpha = alpha(a, 0.78f)
+            color = 0xFF202A34.toInt()
+            alpha = alpha(a, 0.62f)
             style = Paint.Style.FILL
         }
-        val arrow = scale * 0.018f
+        val arrow = scale * (if (isPortrait()) 0.018f else 0.022f)
         fun triangle(points: FloatArray) {
             val path = Path().apply {
                 moveTo(points[0], points[1])
@@ -285,8 +285,8 @@ class VirtualControllerView(
 
     private fun hitTest(x: Float, y: Float): Int {
         val scale = min(width, height).toFloat()
-        val dpadX = (if (isPortrait()) 0.22f else 0.16f) * width
-        val dpadY = (if (isPortrait()) 0.70f else 0.75f) * height
+        val dpadX = 0.22f * width
+        val dpadY = (if (isPortrait()) 0.70f else 0.67f) * height
         val dx = x - dpadX
         val dy = y - dpadY
         val reach = scale * 0.19f
