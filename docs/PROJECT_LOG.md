@@ -726,3 +726,8 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - Modification du code enregistrée sur la branche de test ; la compilation CI doit encore être vérifiée.
 - Aucun test visuel sur appareil n'a été effectué après cette modification.
 - La fidélité finale des matériaux et du rendu à 50 % d'opacité devra être contrôlée sur la prochaine capture de l'APK.
+
+
+### Complément de recalage
+- Le D-pad est étiré horizontalement selon le rapport du panneau de référence (530 × 290) et celui de l'écran paysage, tout en conservant des branches visuellement équilibrées.
+- La zone de détection directionnelle a été élargie pour couvrir le nouveau dessin ; elle reste indépendante du rendu.
