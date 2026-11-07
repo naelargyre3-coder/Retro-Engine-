@@ -10,6 +10,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ImageView
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
@@ -54,8 +55,14 @@ class MainActivity : ComponentActivity() {
             clipToPadding = false
             addView(page)
         }
-        val title = makeText("RETRO ENGINE", 30f, 0xFFFFFFFF.toInt(), true)
-        val subtitle = makeText("Atelier de création de jeux Android", 15f, 0xFF9EADBF.toInt())
+        val logo = ImageView(this).apply {
+            setImageResource(R.drawable.retro_engine_logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Logo Retro Engine"
+        }
+        val subtitle = makeText("Atelier de création de jeux Android", 15f, 0xFF9EADBF.toInt()).apply {
+            gravity = Gravity.CENTER
+        }
         val accent = View(this).apply { setBackgroundColor(0xFF00D9FF.toInt()) }
         val importButton = Button(this).apply {
             text = "IMPORTER UNE ROM"
@@ -81,7 +88,10 @@ class MainActivity : ComponentActivity() {
                 "Les autres consoles sont uniquement détectées pour le moment.",
             13f, 0xFFFFD58A.toInt()
         )
-        page.addView(title)
+        page.addView(logo, LinearLayout.LayoutParams(dp(184), dp(184)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(6)
+        })
         page.addView(subtitle, margin(4))
         page.addView(accent, LinearLayout.LayoutParams(-1, dp(3)).apply {
             topMargin = dp(22); bottomMargin = dp(22)

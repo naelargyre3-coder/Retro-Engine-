@@ -762,3 +762,28 @@ Vérifier le workflow GitHub Actions de cette branche, corriger toute erreur de 
 - Correction de la hauteur des capsules SELECT/START indépendamment de leur largeur, afin de retrouver leur silhouette basse et allongée de la maquette.
 - Réduction de la taille du lettrage pour éviter que les libellés prennent trop de place dans les capsules.
 - Cette retouche est enregistrée ; elle doit être incluse dans la validation CI du dernier commit.
+
+## 2026-11-07 — Intégration du logo officiel et correction de l'échelle du D-pad NES
+
+### Retour utilisateur
+- Le D-pad reste légèrement trop petit sur la capture de test.
+- Le logo officiel Retro Engine fourni dans la conversation n'avait pas été intégré.
+
+### Fichiers modifiés
+- `app/src/main/res/drawable-nodpi/retro_engine_logo.webp`
+- `app/src/main/AndroidManifest.xml`
+- `app/src/main/java/fr/retroengine/MainActivity.kt`
+- `app/src/main/java/fr/retroengine/VirtualControllerView.kt`
+- `docs/PROJECT_LOG.md`
+
+### Modifications
+- Ajout du logo officiel fourni, converti en WebP 192 × 192 avec transparence.
+- Déclaration du logo comme icône de lancement Android.
+- Affichage du logo en tête de l'écran d'accueil, centré au-dessus du sous-titre.
+- Augmentation modérée du D-pad : branches et largeur augmentées d'environ 10 à 12 %, sans déplacer son centre.
+- Aucun changement des entrées, zones tactiles, diagonales, multitouch, A/B ou SELECT/START.
+
+### Vérification et limites
+- Les sources et le logo sont enregistrés sur `v2.3-touch-controls`.
+- La compilation et la génération APK doivent être vérifiées par GitHub Actions.
+- Aucun test visuel sur appareil après installation n'a encore été effectué.

@@ -217,8 +217,8 @@ class VirtualControllerView(
     private fun drawDpad(canvas: Canvas, scale: Float, a: Int) {
         val cx = 0.22f * width
         val cy = (if (isPortrait()) 0.70f else 0.67f) * height
-        val arm = scale * (if (isPortrait()) 0.145f else 0.224f)
-        val half = scale * (if (isPortrait()) 0.052f else 0.078f)
+        val arm = scale * (if (isPortrait()) 0.160f else 0.250f)
+        val half = scale * (if (isPortrait()) 0.058f else 0.085f)
         val corner = half * 0.27f
 
         // Une seule forme en croix : les quatre branches ne se chevauchent plus visuellement.
