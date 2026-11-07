@@ -13,23 +13,28 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 
 class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
     private lateinit var surfaceView: SurfaceView
-    private lateinit var status: TextView
     private val running = AtomicBoolean(false)
     @Volatile private var currentInputMask = 0
+    @Volatile private var touchInputMask = 0
+    @Volatile private var hardwareInputMask = 0
+    @Volatile private var hardwareAxisMask = 0
+    private val pressedHardwareKeys = mutableSetOf<Int>()
     private var renderThread: Thread? = null
     private var audioTrack: AudioTrack? = null
     private var nativeStarted = false
     private var romPath: String = ""
+    private var displayAspect: Int = 1
 
     companion object {
         init {
@@ -47,27 +52,26 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         private const val X = 1 shl 9
     }
 
-    private external fun nativeStart(surface: Surface, romPath: String, systemDir: String, saveDir: String): String?
+    private external fun nativeStart(surface: Surface, romPath: String, systemDir: String, saveDir: String, displayAspect: Int): String?
     private external fun nativeSetSurface(surface: Surface?)
     private external fun nativeRunFrame()
     private external fun nativeSetInputMask(mask: Int)
     private external fun nativeDrainAudio(output: ShortArray): Int
     private external fun nativeGetSampleRate(): Double
     private external fun nativeGetFps(): Double
-    private external fun nativeGetVideoDiagnostics(): String
     private external fun nativeSaveRam()
-    private external fun nativeSaveState(): String?
-    private external fun nativeLoadState(): String?
     private external fun nativeStop()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         romPath = intent.getStringExtra("rom_path").orEmpty()
+        displayAspect = intent.getIntExtra("display_aspect", 1).coerceIn(0, 1)
         if (romPath.isBlank()) {
             finish()
             return
         }
+        enterImmersiveMode()
         buildScreen()
     }
 
@@ -77,135 +81,29 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         surfaceView.holder.addCallback(this)
         root.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
 
-        status = TextView(this).apply {
-            text = "Initialisation du moteur NES…"
-            setTextColor(Color.WHITE)
-            textSize = 13f
-            setPadding(12, 8, 12, 8)
-            setBackgroundColor(0x99000000.toInt())
+        // L'overlay transparent reste au-dessus de la vidéo sans réduire sa surface.
+        val controller = VirtualControllerView(this) { mask ->
+            touchInputMask = mask
+            publishInputMask()
         }
-        val topBar = FrameLayout(this).apply {
-            setPadding(dp(8), dp(4), dp(8), dp(4))
-            setBackgroundColor(0x99000000.toInt())
-        }
-        status.maxWidth = dp(230)
-        status.maxLines = 3
-        status.textSize = 10f
-        topBar.addView(status, FrameLayout.LayoutParams(-2, -2, Gravity.START or Gravity.CENTER_VERTICAL))
-
-        // START et SELECT forment un groupe distinct, centré horizontalement en haut de l'écran.
-        val systemButtons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        addControl(systemButtons, "SELECT", SELECT)
-        addControl(systemButtons, "START", START)
-        topBar.addView(systemButtons, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
-
-        val saveButtons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val saveStateButton = Button(this).apply {
-            text = "SAUVER"
-            textSize = 10f
-            isAllCaps = false
-            setOnClickListener { performStateAction("État sauvegardé") { nativeSaveState() } }
-        }
-        val loadStateButton = Button(this).apply {
-            text = "CHARGER"
-            textSize = 10f
-            isAllCaps = false
-            setOnClickListener { performStateAction("État restauré") { nativeLoadState() } }
-        }
-        saveButtons.addView(saveStateButton, LinearLayout.LayoutParams(-2, dp(42)))
-        saveButtons.addView(loadStateButton, LinearLayout.LayoutParams(-2, dp(42)))
-        topBar.addView(saveButtons, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL))
-        root.addView(topBar, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
-
-        val controls = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(18, 8, 18, 8)
-            setBackgroundColor(0x66000000)
-        }
-        // Croix en quatre directions, organisée en véritable forme de +.
-        val dpad = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-        }
-        val dpadTop = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        addControl(dpadTop, "▲", UP)
-        dpad.addView(dpadTop)
-
-        val dpadMiddle = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        addControl(dpadMiddle, "◀", LEFT)
-        dpadMiddle.addView(View(this), LinearLayout.LayoutParams(dp(12), 1))
-        addControl(dpadMiddle, "▶", RIGHT)
-        dpad.addView(dpadMiddle)
-
-        val dpadBottom = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        addControl(dpadBottom, "▼", DOWN)
-        dpad.addView(dpadBottom)
-        controls.addView(dpad, LinearLayout.LayoutParams(dp(150), -1))
-        val spacer = View(this)
-        controls.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
-        // La NES ne possède que deux boutons d'action : B et A.
-        val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
-        addControl(buttons, "B", B)
-        addControl(buttons, "A", A)
-        controls.addView(buttons)
-        root.addView(controls, FrameLayout.LayoutParams(-1, dp(116), Gravity.BOTTOM))
+        root.addView(controller, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
     }
 
-    private fun addControl(parent: LinearLayout, label: String, bit: Int) {
-        val button = Button(this).apply {
-            text = label
-            textSize = if (label.length > 1) 10f else 18f
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            setBackgroundColor(0xCC26384A.toInt())
-            setPadding(8, 0, 8, 0)
-            minWidth = dp(if (label.length > 1) 68 else 48)
-            minHeight = dp(42)
-            setOnTouchListener { _, event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> updateInput(bit, true)
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_UP -> updateInput(bit, false)
-                }
-                true
-            }
-        }
-        parent.addView(button, LinearLayout.LayoutParams(-2, dp(46)).apply {
-            setMargins(dp(3), dp(2), dp(3), dp(2))
-        })
-    }
-
     private fun updateInput(bit: Int, pressed: Boolean) {
-        currentInputMask = if (pressed) currentInputMask or bit else currentInputMask and bit.inv()
-        nativeSetInputMask(currentInputMask)
+        touchInputMask = if (pressed) touchInputMask or bit else touchInputMask and bit.inv()
+        publishInputMask()
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         val saveDirectory = java.io.File(filesDir, "saves").apply { mkdirs() }
-        val error = nativeStart(holder.surface, romPath, filesDir.absolutePath, saveDirectory.absolutePath)
+        val error = nativeStart(holder.surface, romPath, filesDir.absolutePath, saveDirectory.absolutePath, displayAspect)
         if (error != null) {
             nativeStop()
-            status.text = error
+            android.util.Log.e("RetroEngine", error)
             return
         }
         nativeStarted = true
-        status.text = "Nestopia actif · NES"
         startAudioAndLoop()
     }
 
@@ -220,14 +118,6 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
             nativeStop()
             nativeStarted = false
         }
-    }
-
-    private fun performStateAction(successMessage: String, action: () -> String?) {
-        if (!nativeStarted) return
-        stopLoop()
-        val error = action()
-        status.text = error ?: successMessage
-        startAudioAndLoop()
     }
 
     private fun startAudioAndLoop() {
@@ -254,18 +144,9 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         renderThread = Thread({
             val samples = ShortArray(4096)
             var nextFrame = System.nanoTime()
-            var diagnosticFrames = 0
             while (running.get()) {
                 nativeSetInputMask(currentInputMask)
                 nativeRunFrame()
-                diagnosticFrames++
-                if (diagnosticFrames >= 60) {
-                    diagnosticFrames = 0
-                    val diagnostics = nativeGetVideoDiagnostics()
-                    runOnUiThread {
-                        if (nativeStarted && running.get()) status.text = diagnostics
-                    }
-                }
                 val count = nativeDrainAudio(samples)
                 if (count > 0) audioTrack?.write(samples, 0, count)
                 nextFrame += frameNanos
@@ -308,19 +189,86 @@ class EmulatorActivity : ComponentActivity(), SurfaceHolder.Callback {
         else -> 0
     }
 
+    private fun publishInputMask() {
+        currentInputMask = touchInputMask or hardwareInputMask
+        nativeSetInputMask(currentInputMask)
+    }
+
+    private fun refreshHardwareInputMask() {
+        var mask = 0
+        for (keyCode in pressedHardwareKeys) mask = mask or keyMask(keyCode)
+        hardwareInputMask = mask or hardwareAxisMask
+        publishInputMask()
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val bit = keyMask(event.keyCode)
+        if (bit != 0) {
+            if (event.action == KeyEvent.ACTION_DOWN) pressedHardwareKeys.add(event.keyCode)
+            else if (event.action == KeyEvent.ACTION_UP) pressedHardwareKeys.remove(event.keyCode)
+            refreshHardwareInputMask()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        val bit = keyMask(keyCode)
-        if (bit != 0) { updateInput(bit, true); return true }
+        if (keyMask(keyCode) != 0) {
+            pressedHardwareKeys.add(keyCode)
+            refreshHardwareInputMask()
+            return true
+        }
         return super.onKeyDown(keyCode, event)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        val bit = keyMask(keyCode)
-        if (bit != 0) { updateInput(bit, false); return true }
+        if (keyMask(keyCode) != 0) {
+            pressedHardwareKeys.remove(keyCode)
+            refreshHardwareInputMask()
+            return true
+        }
         return super.onKeyUp(keyCode, event)
     }
 
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.source and android.view.InputDevice.SOURCE_JOYSTICK == android.view.InputDevice.SOURCE_JOYSTICK && event.action == MotionEvent.ACTION_MOVE) {
+            var mask = 0
+            val x = event.getAxisValue(MotionEvent.AXIS_X)
+            val y = event.getAxisValue(MotionEvent.AXIS_Y)
+            val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+            val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+            if (x < -0.5f || hatX < -0.5f) mask = mask or LEFT
+            if (x > 0.5f || hatX > 0.5f) mask = mask or RIGHT
+            if (y < -0.5f || hatY < -0.5f) mask = mask or UP
+            if (y > 0.5f || hatY > 0.5f) mask = mask or DOWN
+            var keyBits = 0
+            for (keyCode in pressedHardwareKeys) keyBits = keyBits or keyMask(keyCode)
+            hardwareAxisMask = mask
+            hardwareInputMask = keyBits or hardwareAxisMask
+            publishInputMask()
+            return true
+        }
+        return super.onGenericMotionEvent(event)
+    }
+
+    // Keep Android system bars hidden throughout the active gameplay window.
+    private fun enterImmersiveMode() {
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enterImmersiveMode()
+    }
+
     override fun onPause() {
+        touchInputMask = 0
+        hardwareInputMask = 0
+        hardwareAxisMask = 0
+        pressedHardwareKeys.clear()
         currentInputMask = 0
         if (nativeStarted) nativeSetInputMask(0)
         stopLoop()

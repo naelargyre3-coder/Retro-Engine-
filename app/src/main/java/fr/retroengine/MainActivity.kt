@@ -10,6 +10,9 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ImageView
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +26,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var playButton: Button
     private var selectedRom: Uri? = null
     private var nesCoreLoaded = false
+    private var selectedDisplayAspect = 1 // 0 = 4:3, 1 = 16:9
 
     private val romPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) handleSelectedRom(uri)
@@ -32,6 +36,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = 0xFF0B1018.toInt()
         window.navigationBarColor = 0xFF0B1018.toInt()
+        selectedDisplayAspect = getSharedPreferences("retro_engine", MODE_PRIVATE).getInt("display_aspect", 1).coerceIn(0, 1)
         buildScreen()
         val coreStatus = NestopiaCoreLoader.load()
         nesCoreLoaded = coreStatus.loaded
@@ -44,9 +49,20 @@ class MainActivity : ComponentActivity() {
             setPadding(dp(22), dp(26), dp(22), dp(26))
             setBackgroundColor(0xFF0B1018.toInt())
         }
-        val scroll = ScrollView(this).apply { addView(page) }
-        val title = makeText("RETRO ENGINE", 30f, 0xFFFFFFFF.toInt(), true)
-        val subtitle = makeText("Atelier de création de jeux Android", 15f, 0xFF9EADBF.toInt())
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(0xFF0B1018.toInt())
+            isFillViewport = true
+            clipToPadding = false
+            addView(page)
+        }
+        val logo = ImageView(this).apply {
+            setImageResource(R.drawable.retro_engine_logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Logo Retro Engine"
+        }
+        val subtitle = makeText("Atelier de création de jeux Android", 15f, 0xFF9EADBF.toInt()).apply {
+            gravity = Gravity.CENTER
+        }
         val accent = View(this).apply { setBackgroundColor(0xFF00D9FF.toInt()) }
         val importButton = Button(this).apply {
             text = "IMPORTER UNE ROM"
@@ -72,17 +88,54 @@ class MainActivity : ComponentActivity() {
                 "Les autres consoles sont uniquement détectées pour le moment.",
             13f, 0xFFFFD58A.toInt()
         )
-        page.addView(title)
+        page.addView(logo, LinearLayout.LayoutParams(dp(184), dp(184)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(6)
+        })
         page.addView(subtitle, margin(4))
         page.addView(accent, LinearLayout.LayoutParams(-1, dp(3)).apply {
             topMargin = dp(22); bottomMargin = dp(22)
         })
+        page.addView(makeText("FORMAT D’AFFICHAGE", 14f, 0xFFFFFFFF.toInt(), true), margin(4))
+        val aspectGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.HORIZONTAL
+            val ratio43 = RadioButton(context).apply {
+                id = View.generateViewId()
+                text = "4:3"
+                setTextColor(0xFFFFFFFF.toInt())
+                buttonTintList = android.content.res.ColorStateList.valueOf(0xFF00D9FF.toInt())
+                tag = 0
+            }
+            val ratio169 = RadioButton(context).apply {
+                id = View.generateViewId()
+                text = "16:9"
+                setTextColor(0xFFFFFFFF.toInt())
+                buttonTintList = android.content.res.ColorStateList.valueOf(0xFF00D9FF.toInt())
+                tag = 1
+            }
+            addView(ratio43)
+            addView(ratio169)
+            check(if (selectedDisplayAspect == 0) ratio43.id else ratio169.id)
+            setOnCheckedChangeListener { group, checkedId ->
+                selectedDisplayAspect = if (group.findViewById<RadioButton>(checkedId)?.tag == 0) 0 else 1
+                getSharedPreferences("retro_engine", MODE_PRIVATE).edit()
+                    .putInt("display_aspect", selectedDisplayAspect).apply()
+            }
+        }
+        page.addView(aspectGroup, margin(6))
         page.addView(coreText, margin(0))
         page.addView(importButton, margin(20).apply { height = dp(54) })
         page.addView(playButton, margin(10).apply { height = dp(54) })
         page.addView(statusText, margin(26))
         page.addView(resultText, margin(10))
         page.addView(notice, margin(34))
+        val flexibleSpace = View(this)
+        page.addView(flexibleSpace, LinearLayout.LayoutParams(-1, 0, 1f))
+        val footer = makeText("RETRO ENGINE  •  VERSION EXPÉRIMENTALE", 11f, 0xFF657386.toInt()).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(18), 0, dp(4))
+        }
+        page.addView(footer, LinearLayout.LayoutParams(-1, -2))
         setContentView(scroll)
     }
 
@@ -131,7 +184,7 @@ class MainActivity : ComponentActivity() {
                 FileOutputStream(destination).use { output -> input.copyTo(output) }
             } ?: throw IllegalStateException("Impossible d'ouvrir le fichier ROM.")
             if (destination.length() <= 16L) throw IllegalStateException("Le fichier ROM est incomplet.")
-            startActivity(Intent(this, EmulatorActivity::class.java).putExtra("rom_path", destination.absolutePath))
+            startActivity(Intent(this, EmulatorActivity::class.java).putExtra("rom_path", destination.absolutePath).putExtra("display_aspect", selectedDisplayAspect))
         } catch (error: Exception) {
             statusText.text = "Impossible de préparer la ROM : ${error.message ?: "erreur inconnue"}"
         }

@@ -58,6 +58,7 @@ std::mutex audioMutex;
 std::deque<int16_t> audioQueue;
 std::atomic<int> inputMask{0};
 std::atomic<int> pixelFormat{RETRO_PIXEL_FORMAT_RGB565};
+std::atomic<int> displayAspectMode{1};
 std::atomic<unsigned> videoCallbackCount{0};
 std::atomic<unsigned> frameRunCount{0};
 std::atomic<unsigned> windowLockFailures{0};
@@ -195,13 +196,29 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
         return;
     }
 
-    const float scale = std::min(
-        static_cast<float>(buffer.width) / static_cast<float>(width),
-        static_cast<float>(buffer.height) / static_cast<float>(height));
-    const int drawWidth = std::max(1, static_cast<int>(width * scale));
-    const int drawHeight = std::max(1, static_cast<int>(height * scale));
-    const int offsetX = (buffer.width - drawWidth) / 2;
-    const int offsetY = (buffer.height - drawHeight) / 2;
+    // Le mode 16:9 réserve un cadre 16:9 centré dans la surface Android.
+    // L'image NES (présentation 4:3) est entièrement contenue dans ce cadre :
+    // aucun recadrage ni étirement ; les zones restantes restent noires.
+    const float surfaceWidth = static_cast<float>(buffer.width);
+    const float surfaceHeight = static_cast<float>(buffer.height);
+    const bool widescreenFrame = displayAspectMode.load() != 0;
+    float frameWidth = surfaceWidth;
+    float frameHeight = surfaceHeight;
+    if (widescreenFrame) {
+        const float frameScale = std::min(surfaceWidth / 16.0f, surfaceHeight / 9.0f);
+        frameWidth = 16.0f * frameScale;
+        frameHeight = 9.0f * frameScale;
+    }
+    const float frameLeft = (surfaceWidth - frameWidth) * 0.5f;
+    const float frameTop = (surfaceHeight - frameHeight) * 0.5f;
+    const float displayWidth = static_cast<float>(height) * (4.0f / 3.0f);
+    const float gameScale = std::min(frameWidth / displayWidth,
+                                     frameHeight / static_cast<float>(height));
+    const float gameWidth = displayWidth * gameScale;
+    const float gameHeight = static_cast<float>(height) * gameScale;
+    const float offsetX = frameLeft + (frameWidth - gameWidth) * 0.5f;
+    const float offsetY = frameTop + (frameHeight - gameHeight) * 0.5f;
+    const float scale = gameScale;
 
     auto *dst565 = output565 ? static_cast<uint16_t *>(buffer.bits) : nullptr;
     auto *dst8888 = output8888 ? static_cast<uint8_t *>(buffer.bits) : nullptr;
@@ -217,12 +234,25 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
     }
 
     const auto *source = static_cast<const uint8_t *>(data);
-    for (int y = 0; y < drawHeight; ++y) {
-        const unsigned sourceY = std::min(height - 1, static_cast<unsigned>(y / scale));
-        auto *row565 = output565 ? dst565 + (offsetY + y) * buffer.stride : nullptr;
-        auto *row8888 = output8888 ? dst8888 + (offsetY + y) * buffer.stride * 4 : nullptr;
-        for (int x = 0; x < drawWidth; ++x) {
-            const unsigned sourceX = std::min(width - 1, static_cast<unsigned>(x / scale));
+    const float sourceBytesPerPixel =
+        sourceFormat == RETRO_PIXEL_FORMAT_XRGB8888 ? 4.0f : 2.0f;
+    if (pitch < static_cast<size_t>(width) * static_cast<size_t>(sourceBytesPerPixel)) {
+        const int postResult = ANativeWindow_unlockAndPost(window);
+        if (postResult != 0) windowPostFailures.fetch_add(1);
+        LOGE("Pitch source invalide : %zu pour une largeur de %u.", pitch, width);
+        return;
+    }
+    for (int y = 0; y < buffer.height; ++y) {
+        const float mappedY = (static_cast<float>(y) - offsetY) / scale;
+        if (mappedY < 0.0f || mappedY >= static_cast<float>(height)) continue;
+        const unsigned sourceY = std::min(static_cast<unsigned>(mappedY), height - 1);
+        auto *row565 = output565 ? dst565 + y * buffer.stride : nullptr;
+        auto *row8888 = output8888 ? dst8888 + y * buffer.stride * 4 : nullptr;
+        for (int x = 0; x < buffer.width; ++x) {
+            const float mappedDisplayX = (static_cast<float>(x) - offsetX) / scale;
+            if (mappedDisplayX < 0.0f || mappedDisplayX >= displayWidth) continue;
+            const float mappedX = mappedDisplayX * static_cast<float>(width) / displayWidth;
+            const unsigned sourceX = std::min(static_cast<unsigned>(mappedX), width - 1);
             const uint8_t *p = source + sourceY * pitch;
             uint8_t r = 0, g = 0, b = 0;
             if (sourceFormat == RETRO_PIXEL_FORMAT_XRGB8888) {
@@ -248,9 +278,9 @@ void drawFrame(const void *data, unsigned width, unsigned height, size_t pitch) 
             }
 
             if (output565) {
-                row565[offsetX + x] = static_cast<uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+                row565[x] = static_cast<uint16_t>(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
             } else {
-                uint8_t *pixel = row8888 + (offsetX + x) * 4;
+                uint8_t *pixel = row8888 + x * 4;
                 pixel[0] = r;
                 pixel[1] = g;
                 pixel[2] = b;
@@ -405,9 +435,11 @@ bool openCore() {
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_fr_retroengine_EmulatorActivity_nativeStart(JNIEnv *env, jobject, jobject surface,
-                                                  jstring romPath, jstring systemDir, jstring saveDir) {
+                                                  jstring romPath, jstring systemDir, jstring saveDir,
+                                                  jint aspectMode) {
     lastError.clear();
-    LOGI("nativeStart appelé : initialisation du moteur NES.");
+    displayAspectMode.store(aspectMode == 0 ? 0 : 1);
+    LOGI("nativeStart appelé : initialisation du moteur NES (ratio %s).", aspectMode == 0 ? "4:3" : "16:9");
     videoCallbackCount.store(0);
     frameRunCount.store(0);
     windowLockFailures.store(0);
