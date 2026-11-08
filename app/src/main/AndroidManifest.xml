@@ -15,10 +15,18 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".GameActivity"
+            android:exported="false"
+            android:process=":game"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|layoutDirection" />
+        <activity
+            android:name=".GameDetailActivity"
+            android:exported="false" />
+        <activity
             android:name=".ControllerConfigActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|layoutDirection" />
-            <activity
+        <activity
             android:name=".GraphicsConfigActivity"
             android:exported="false" />
     </application>
