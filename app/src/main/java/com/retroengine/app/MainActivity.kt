@@ -1,11 +1,11 @@
 package com.retroengine.app
 
 import android.content.Context
+import android.content.Intent
 import android.hardware.input.InputManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
-import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
     private var sramFile: File? = null
     private var lastSram: ByteArray? = null
     private var inputManager: InputManager? = null
+    private var mapping: ControllerMapping? = null
 
     // Etat des 4 directions envoyees par stick ou croix de la manette
     private val dirState = BooleanArray(4)
@@ -65,9 +66,21 @@ class MainActivity : ComponentActivity() {
             setImageResource(R.drawable.retro_logo)
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
-        val button = Button(this).apply {
+        val romButton = Button(this).apply {
             text = "Choisir une ROM NES"
             setOnClickListener { pickRom.launch(arrayOf("*/*")) }
+        }
+        val configButton = Button(this).apply {
+            text = "Configurer la manette"
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, ControllerConfigActivity::class.java))
+            }
+        }
+        val matchWidth = {
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
         }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -77,13 +90,8 @@ class MainActivity : ComponentActivity() {
                 logo,
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
             )
-            addView(
-                button,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
+            addView(romButton, matchWidth())
+            addView(configButton, matchWidth())
         }
         setContentView(root)
     }
@@ -95,39 +103,16 @@ class MainActivity : ComponentActivity() {
 
     // ---------- Manettes ----------
 
-    private fun isGamepadSource(source: Int): Boolean =
-        (source and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
-            (source and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
-
-    private fun hasGamepad(): Boolean =
-        InputDevice.getDeviceIds().any { id ->
-            val device = InputDevice.getDevice(id)
-            device != null && !device.isVirtual && isGamepadSource(device.sources)
-        }
-
-    private fun mapPadKey(keyCode: Int): Int? = when (keyCode) {
-        KeyEvent.KEYCODE_DPAD_UP,
-        KeyEvent.KEYCODE_DPAD_DOWN,
-        KeyEvent.KEYCODE_DPAD_LEFT,
-        KeyEvent.KEYCODE_DPAD_RIGHT -> keyCode
-        KeyEvent.KEYCODE_BUTTON_A,
-        KeyEvent.KEYCODE_BUTTON_X -> KeyEvent.KEYCODE_BUTTON_B
-        KeyEvent.KEYCODE_BUTTON_B,
-        KeyEvent.KEYCODE_BUTTON_Y -> KeyEvent.KEYCODE_BUTTON_A
-        KeyEvent.KEYCODE_BUTTON_START -> KeyEvent.KEYCODE_BUTTON_START
-        KeyEvent.KEYCODE_BUTTON_SELECT -> KeyEvent.KEYCODE_BUTTON_SELECT
-        else -> null
-    }
-
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val view = retroView
-        if (view != null && isGamepadSource(event.source)) {
-            val mapped = mapPadKey(event.keyCode)
-            if (mapped != null) {
+        val map = mapping
+        if (view != null && map != null && isGamepadSource(event.source)) {
+            val action = map.lookup(event.keyCode)
+            if (action != null) {
                 if (event.repeatCount == 0 &&
                     (event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP)
                 ) {
-                    view.sendKeyEvent(event.action, mapped, 0)
+                    view.sendKeyEvent(event.action, action.retroKey, 0)
                 }
                 return true
             }
@@ -220,6 +205,8 @@ class MainActivity : ComponentActivity() {
             return
         }
         val romId = digest.digest().joinToString("") { "%02x".format(it) }
+
+        mapping = ControllerMapping(this)
 
         val saves = File(filesDir, "saves").apply { mkdirs() }
         val sram = File(saves, "$romId.sram")
