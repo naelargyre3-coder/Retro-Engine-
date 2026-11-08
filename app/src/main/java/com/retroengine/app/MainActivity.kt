@@ -1,289 +1,178 @@
 package com.retroengine.app
 
-import android.content.Context
 import android.content.Intent
-import android.hardware.input.InputManager
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
-import android.view.KeyEvent
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import com.swordfish.libretrodroid.GLRetroView
-import com.swordfish.libretrodroid.GLRetroViewData
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import java.io.File
-import java.security.MessageDigest
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : ComponentActivity() {
 
-    private var retroView: GLRetroView? = null
-    private var touchOverlay: TouchOverlay? = null
-    private var overlayHidden = false
-    private var sramFile: File? = null
-    private var lastSram: ByteArray? = null
-    private var inputManager: InputManager? = null
-    private var mapping: ControllerMapping? = null
-
-    // Etat des 4 directions envoyees par stick ou croix de la manette
-    private val dirState = BooleanArray(4)
-    private val dirKeys = intArrayOf(
-        KeyEvent.KEYCODE_DPAD_LEFT,
-        KeyEvent.KEYCODE_DPAD_RIGHT,
-        KeyEvent.KEYCODE_DPAD_UP,
-        KeyEvent.KEYCODE_DPAD_DOWN
-    )
-
-    private val deviceListener = object : InputManager.InputDeviceListener {
-        override fun onInputDeviceAdded(deviceId: Int) = updateOverlay()
-        override fun onInputDeviceRemoved(deviceId: Int) = updateOverlay()
-        override fun onInputDeviceChanged(deviceId: Int) = updateOverlay()
-    }
+    private lateinit var library: GameLibrary
+    private lateinit var listContainer: LinearLayout
 
     private val pickRom =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) startGame(uri)
+            if (uri != null) importRom(uri)
         }
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun matchWidth() = LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        library = GameLibrary(this)
+
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
 
         val logo = ImageView(this).apply {
             setImageResource(R.drawable.retro_logo)
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
-        val romButton = Button(this).apply {
-            text = "Choisir une ROM NES"
+        column.addView(
+            logo,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(140))
+        )
+
+        column.addView(TextView(this).apply {
+            text = "Mes jeux"
+            textSize = 22f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(0, dp(12), 0, dp(8))
+        })
+
+        listContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        column.addView(listContainer, matchWidth())
+
+        column.addView(Button(this).apply {
+            text = "Ajouter un jeu (ROM NES)"
             setOnClickListener { pickRom.launch(arrayOf("*/*")) }
-        }
-        val configButton = Button(this).apply {
-            text = "Configurer la manette"
+        }, matchWidth())
+
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row.addView(Button(this).apply {
+            text = "Manette"
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, ControllerConfigActivity::class.java))
             }
-        }
-                val graphicsButton = Button(this).apply {
-            text = "Paramètres graphiques"
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(Button(this).apply {
+            text = "Graphismes"
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, GraphicsConfigActivity::class.java))
             }
-                }
-        val matchWidth = {
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        column.addView(row, matchWidth())
+
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(0xFF010317.toInt())
+            addView(column)
         }
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(64, 160, 64, 200)
-            addView(
-                logo,
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
-            )
-            addView(romButton, matchWidth())
-            addView(configButton, matchWidth())
-            addView(graphicsButton, matchWidth())
+        ViewCompat.setOnApplyWindowInsetsListener(scroll) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
         }
-        setContentView(root)
+        setContentView(scroll)
     }
 
-    override fun onDestroy() {
-        inputManager?.unregisterInputDeviceListener(deviceListener)
-        super.onDestroy()
+    override fun onResume() {
+        super.onResume()
+        refresh()
     }
 
-    // ---------- Manettes ----------
-
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val view = retroView
-        val map = mapping
-        if (view != null && map != null && isGamepadSource(event.source)) {
-            val action = map.lookup(event.keyCode)
-            if (action != null) {
-                if (event.repeatCount == 0 &&
-                    (event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP)
-                ) {
-                    view.sendKeyEvent(event.action, action.retroKey, 0)
-                }
-                return true
-            }
-        }
-        return super.dispatchKeyEvent(event)
-    }
-
-    private fun setDirection(index: Int, on: Boolean) {
-        if (dirState[index] == on) return
-        dirState[index] = on
-        val action = if (on) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
-        retroView?.sendKeyEvent(action, dirKeys[index], 0)
-    }
-
-    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (retroView != null && isGamepadSource(event.source) &&
-            event.actionMasked == MotionEvent.ACTION_MOVE
-        ) {
-            val x = event.getAxisValue(MotionEvent.AXIS_X)
-            val y = event.getAxisValue(MotionEvent.AXIS_Y)
-            val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
-            val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
-            setDirection(0, x < -0.5f || hatX < -0.5f)
-            setDirection(1, x > 0.5f || hatX > 0.5f)
-            setDirection(2, y < -0.5f || hatY < -0.5f)
-            setDirection(3, y > 0.5f || hatY > 0.5f)
-            return true
-        }
-        return super.dispatchGenericMotionEvent(event)
-    }
-
-    private fun updateOverlay() {
-        val overlay = touchOverlay ?: return
-        val hide = hasGamepad()
-        if (hide == overlayHidden) return
-        overlayHidden = hide
-        if (hide) {
-            overlay.releaseAll()
-            overlay.animate()
-                .alpha(0f).scaleX(0.92f).scaleY(0.92f)
-                .setDuration(250)
-                .withEndAction { if (overlayHidden) overlay.visibility = View.GONE }
-                .start()
-        } else {
-            overlay.visibility = View.VISIBLE
-            overlay.animate()
-                .alpha(1f).scaleX(1f).scaleY(1f)
-                .setDuration(250)
-                .start()
-        }
-    }
-
-    // ---------- Sauvegardes ----------
-
-    private suspend fun persistSram() {
-        val view = retroView ?: return
-        val file = sramFile ?: return
-        try {
-            val bytes = view.serializeSRAM()
-            if (bytes.isNotEmpty() && !bytes.contentEquals(lastSram)) {
-                val tmp = File(file.path + ".tmp")
-                tmp.writeBytes(bytes)
-                tmp.renameTo(file)
-                lastSram = bytes
-            }
-        } catch (e: Exception) {
-            // On reessaiera au prochain passage
-        }
-    }
-
-    // ---------- Jeu ----------
-
-    private fun startGame(uri: Uri) {
-        val rom = File(cacheDir, "rom.nes")
-        val digest = MessageDigest.getInstance("SHA-1")
-        try {
-            contentResolver.openInputStream(uri)?.use { input ->
-                rom.outputStream().use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n == -1) break
-                        output.write(buffer, 0, n)
-                        digest.update(buffer, 0, n)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Impossible de lire la ROM : ${e.message}", Toast.LENGTH_LONG).show()
+    private fun refresh() {
+        listContainer.removeAllViews()
+        val games = library.all()
+        if (games.isEmpty()) {
+            listContainer.addView(TextView(this).apply {
+                text = "Aucun jeu pour l'instant. Ajoute une ROM NES pour commencer."
+                textSize = 14f
+                setTextColor(0xFF9FA8FF.toInt())
+                setPadding(0, dp(4), 0, dp(16))
+            })
             return
         }
-        val romId = digest.digest().joinToString("") { "%02x".format(it) }
+        for (game in games) listContainer.addView(gameCard(game))
+    }
 
-        mapping = ControllerMapping(this)
-        requestedOrientation = GraphicsSettings.orientationFlag(this)
-        val shaderConfig = GraphicsSettings.shaderConfig(this)
-        Toast.makeText(this, "Filtre : ${GraphicsSettings.filter(this).label}", Toast.LENGTH_SHORT).show()
-        
-        val saves = File(filesDir, "saves").apply { mkdirs() }
-        val sram = File(saves, "$romId.sram")
-        sramFile = sram
-        val saved = if (sram.exists()) sram.readBytes() else null
-        lastSram = saved
-
-        val data = GLRetroViewData(this).apply {
-            coreFilePath = "libfceumm_libretro_android.so"
-            gameFilePath = rom.absolutePath
-            systemDirectory = filesDir.absolutePath
-            savesDirectory = saves.absolutePath
-            saveRAMState = saved
-            shader = shaderConfig
+    private fun gameCard(game: GameEntry): View {
+        val title = TextView(this).apply {
+            text = game.name
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFFFFFFF.toInt())
         }
-        val view = GLRetroView(this, data)
-        retroView = view
-        lifecycle.addObserver(view)
-
-        val overlay = TouchOverlay(this) { keyCode, pressed ->
-            val action = if (pressed) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
-            view.sendKeyEvent(action, keyCode, 0)
+        val subtitle = TextView(this).apply {
+            text = if (library.hasSave(game.id)) "${game.console} · Sauvegarde" else game.console
+            textSize = 13f
+            setTextColor(0xFFB0B8FF.toInt())
         }
-        touchOverlay = overlay
-        overlayHidden = false
-
-        val frame = FrameLayout(this)
-        frame.addView(
-            view,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        )
-        frame.addView(
-            overlay,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        )
-        setContentView(frame)
-
-        // Masquage automatique des touches tactiles selon les manettes connectees
-        val manager = getSystemService(Context.INPUT_SERVICE) as InputManager
-        inputManager = manager
-        manager.registerInputDeviceListener(deviceListener, null)
-        updateOverlay()
-
-        // Sauvegarde automatique toutes les 3 secondes pendant le jeu
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                while (true) {
-                    delay(3000)
-                    persistSram()
-                }
+        val texts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(title)
+            addView(subtitle)
+        }
+        val edit = Button(this).apply {
+            text = "Modifier"
+            setOnClickListener {
+                startActivity(
+                    Intent(this@MainActivity, GameDetailActivity::class.java)
+                        .putExtra("gameId", game.id)
+                )
             }
         }
-
-        // Sauvegarde finale quand on appuie sur Retour
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                lifecycleScope.launch {
-                    withTimeoutOrNull(1500) { persistSram() }
-                    finish()
-                }
+        val background = GradientDrawable().apply {
+            setColor(0xFF12132B.toInt())
+            cornerRadius = dp(14).toFloat()
+            setStroke(dp(1), 0x55FFFFFF)
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(10), dp(10), dp(10))
+            this.background = background
+            addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(edit)
+            setOnClickListener {
+                startActivity(
+                    Intent(this@MainActivity, GameActivity::class.java)
+                        .putExtra("gameId", game.id)
+                )
             }
-        })
+            layoutParams = matchWidth().apply { bottomMargin = dp(10) }
+        }
+    }
+
+    private fun importRom(uri: Uri) {
+        try {
+            val entry = library.import(uri)
+            startActivity(
+                Intent(this, GameDetailActivity::class.java).putExtra("gameId", entry.id)
+            )
+        } catch (e: Exception) {
+            Toast.makeText(this, e.message ?: "Importation impossible.", Toast.LENGTH_LONG).show()
+        }
     }
 }
