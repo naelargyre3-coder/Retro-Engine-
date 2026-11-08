@@ -252,7 +252,9 @@ class TouchOverlay(
             if (zone.contains(x, y)) out.add(p.key)
         }
     }
-
+    fun releaseAll() {
+        update(emptySet())
+    }
     private fun update(now: Set<Int>) {
         for (k in now) if (k !in pressedKeys) onKey(k, true)
         for (k in pressedKeys) if (k !in now) onKey(k, false)
