@@ -76,6 +76,12 @@ class MainActivity : ComponentActivity() {
                 startActivity(Intent(this@MainActivity, ControllerConfigActivity::class.java))
             }
         }
+                val graphicsButton = Button(this).apply {
+            text = "Paramètres graphiques"
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, GraphicsConfigActivity::class.java))
+            }
+                }
         val matchWidth = {
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -92,6 +98,7 @@ class MainActivity : ComponentActivity() {
             )
             addView(romButton, matchWidth())
             addView(configButton, matchWidth())
+            addView(graphicsButton, matchWidth())
         }
         setContentView(root)
     }
@@ -207,7 +214,9 @@ class MainActivity : ComponentActivity() {
         val romId = digest.digest().joinToString("") { "%02x".format(it) }
 
         mapping = ControllerMapping(this)
-
+        requestedOrientation = GraphicsSettings.orientationFlag(this)
+        val shaderConfig = GraphicsSettings.shaderConfig(this)
+        
         val saves = File(filesDir, "saves").apply { mkdirs() }
         val sram = File(saves, "$romId.sram")
         sramFile = sram
@@ -220,6 +229,7 @@ class MainActivity : ComponentActivity() {
             systemDirectory = filesDir.absolutePath
             savesDirectory = saves.absolutePath
             saveRAMState = saved
+            shader = shaderConfig
         }
         val view = GLRetroView(this, data)
         retroView = view
