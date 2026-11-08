@@ -216,6 +216,7 @@ class MainActivity : ComponentActivity() {
         mapping = ControllerMapping(this)
         requestedOrientation = GraphicsSettings.orientationFlag(this)
         val shaderConfig = GraphicsSettings.shaderConfig(this)
+        Toast.makeText(this, "Filtre : ${GraphicsSettings.filter(this).label}", Toast.LENGTH_SHORT).show()
         
         val saves = File(filesDir, "saves").apply { mkdirs() }
         val sram = File(saves, "$romId.sram")
