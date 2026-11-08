@@ -1,27 +1,37 @@
 package com.retroengine.app
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
+import android.os.Build
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.WindowManager
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlin.math.hypot
 import kotlin.math.min
 
 private val DARK_OFF = 0xAA30303A.toInt()
 private val DARK_ON = 0xEE62627A.toInt()
-private val RIM = 0xAAFFFFFF.toInt()
-private val ARROW = 0xCCFFFFFF.toInt()
+private val RIM = 0xBBFFFFFF.toInt()
+private val ARROW = 0xDDFFFFFF.toInt()
+private val SHADOW = 0x66000000
+private val HIGHLIGHT = 0x44FFFFFF
 private val RED_LIGHT = 0xFFFF7A7A.toInt()
 private val RED_MID = 0xFFD32F2F.toInt()
 private val RED_DARK = 0xFF7F1414.toInt()
+private val PAD_TOP = 0xDD6A6A78.toInt()
+private val PAD_BOTTOM = 0xDD1C1C24.toInt()
 
 class TouchOverlay(
     context: Context,
@@ -44,6 +54,16 @@ class TouchOverlay(
     private val select = PillButton(KeyEvent.KEYCODE_BUTTON_SELECT, "SELECT")
     private val start = PillButton(KeyEvent.KEYCODE_BUTTON_START, "START")
 
+    private val armKeys = intArrayOf(
+        KeyEvent.KEYCODE_DPAD_UP,
+        KeyEvent.KEYCODE_DPAD_DOWN,
+        KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT,
+        -1
+    )
+    private val armRects = Array(5) { RectF() }
+    private var padShader: Shader? = null
+
     private var padX = 0f
     private var padY = 0f
     private var padR = 0f
@@ -64,15 +84,30 @@ class TouchOverlay(
 
     init {
         ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
-            val bars = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
-            )
-            insetL = bars.left.toFloat()
-            insetR = bars.right.toFloat()
-            insetB = bars.bottom.toFloat()
+            val cut = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            insetL = cut.left.toFloat()
+            insetR = cut.right.toFloat()
+            insetB = cut.bottom.toFloat()
             layoutControls()
             invalidate()
             insets
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        val window = (context as? Activity)?.window ?: return
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowCompat.getInsetsController(window, this)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (Build.VERSION.SDK_INT >= 28) {
+            val lp = window.attributes
+            lp.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            window.attributes = lp
         }
     }
 
@@ -97,14 +132,25 @@ class TouchOverlay(
         val right = w - insetR
         val bottom = h - insetB
         val u = min(w, h)
-        val margin = if (landscape) 0.06f * u else 0.14f * u
+        val margin = if (landscape) 0.07f * u else 0.14f * u
         val side = 0.05f * u
 
         padR = 0.18f * u
         padX = left + side + padR
         padY = bottom - margin - padR
 
-        val r = 0.095f * u
+        val th = padR * 0.62f
+        armRects[0].set(padX - th / 2, padY - padR, padX + th / 2, padY - th / 2)
+        armRects[1].set(padX - th / 2, padY + th / 2, padX + th / 2, padY + padR)
+        armRects[2].set(padX - padR, padY - th / 2, padX - th / 2, padY + th / 2)
+        armRects[3].set(padX + th / 2, padY - th / 2, padX + padR, padY + th / 2)
+        armRects[4].set(padX - th / 2, padY - th / 2, padX + th / 2, padY + th / 2)
+        padShader = LinearGradient(
+            0f, padY - padR, 0f, padY + padR,
+            PAD_TOP, PAD_BOTTOM, Shader.TileMode.CLAMP
+        )
+
+        val r = 0.1f * u
         buttonA.r = r
         buttonA.cx = right - side - r
         buttonA.cy = bottom - margin - 2.3f * r
@@ -201,36 +247,59 @@ class TouchOverlay(
         val th = padR * 0.62f
         val corner = th * 0.22f
         val mid = (th / 2 + padR) / 2
+        val shadowOffset = 0.012f * u
 
-        fun arm(key: Int, l: Float, t: Float, r: Float, b: Float) {
-            fill.color = if (key in pressedKeys) DARK_ON else DARK_OFF
-            canvas.drawRoundRect(l, t, r, b, corner, corner, fill)
-            canvas.drawRoundRect(l, t, r, b, corner, corner, stroke)
+        // Croix directionnelle : ombre, relief, creux central, flèches
+        fill.shader = null
+        fill.color = SHADOW
+        for (rect in armRects) {
+            canvas.drawRoundRect(
+                rect.left, rect.top + shadowOffset, rect.right, rect.bottom + shadowOffset,
+                corner, corner, fill
+            )
         }
-        arm(KeyEvent.KEYCODE_DPAD_UP, padX - th / 2, padY - padR, padX + th / 2, padY - th / 2)
-        arm(KeyEvent.KEYCODE_DPAD_DOWN, padX - th / 2, padY + th / 2, padX + th / 2, padY + padR)
-        arm(KeyEvent.KEYCODE_DPAD_LEFT, padX - padR, padY - th / 2, padX - th / 2, padY + th / 2)
-        arm(KeyEvent.KEYCODE_DPAD_RIGHT, padX + th / 2, padY - th / 2, padX + padR, padY + th / 2)
-        arm(-1, padX - th / 2, padY - th / 2, padX + th / 2, padY + th / 2)
+        for (i in 0 until 5) {
+            if (armKeys[i] in pressedKeys) {
+                fill.shader = null
+                fill.color = DARK_ON
+            } else {
+                fill.shader = padShader
+            }
+            canvas.drawRoundRect(armRects[i], corner, corner, fill)
+            fill.shader = null
+            canvas.drawRoundRect(armRects[i], corner, corner, stroke)
+        }
+        fill.color = 0x66000000
+        canvas.drawCircle(padX, padY, th * 0.28f, fill)
         arrow(canvas, padX, padY - mid, th * 0.22f, 0f, -1f)
         arrow(canvas, padX, padY + mid, th * 0.22f, 0f, 1f)
         arrow(canvas, padX - mid, padY, th * 0.22f, -1f, 0f)
         arrow(canvas, padX + mid, padY, th * 0.22f, 1f, 0f)
 
-        text.textSize = 0.06f * u
+        // Boutons A et B
+        text.textSize = 0.065f * u
         for (b in listOf(buttonA, buttonB)) {
             val on = b.key in pressedKeys
             canvas.save()
             if (on) canvas.scale(0.94f, 0.94f, b.cx, b.cy)
+            fill.shader = null
+            fill.color = SHADOW
+            canvas.drawCircle(b.cx, b.cy + b.r * 0.1f, b.r, fill)
             fill.shader = b.shader
-            fill.alpha = if (on) 255 else 200
+            fill.alpha = if (on) 255 else 215
             canvas.drawCircle(b.cx, b.cy, b.r, fill)
             fill.shader = null
             canvas.drawCircle(b.cx, b.cy, b.r, stroke)
+            fill.color = HIGHLIGHT
+            canvas.drawOval(
+                b.cx - b.r * 0.62f, b.cy - b.r * 0.9f,
+                b.cx + b.r * 0.62f, b.cy - b.r * 0.25f, fill
+            )
             canvas.drawText(b.label, b.cx, b.cy + text.textSize / 3, text)
             canvas.restore()
         }
 
+        // Select et Start
         text.textSize = 0.032f * u
         for (p in listOf(select, start)) {
             fill.color = if (p.key in pressedKeys) DARK_ON else DARK_OFF
