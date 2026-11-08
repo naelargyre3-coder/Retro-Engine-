@@ -3,8 +3,10 @@ package com.retroengine.app
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -71,6 +73,27 @@ class MainActivity : ComponentActivity() {
         }
         val retroView = GLRetroView(this, data)
         lifecycle.addObserver(retroView)
-        setContentView(retroView)
+
+        val overlay = TouchOverlay(this) { keyCode, pressed ->
+            val action = if (pressed) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
+            retroView.sendKeyEvent(action, keyCode, 0)
+        }
+
+        val frame = FrameLayout(this)
+        frame.addView(
+            retroView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        frame.addView(
+            overlay,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        setContentView(frame)
     }
 }
