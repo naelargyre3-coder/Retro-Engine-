@@ -24,14 +24,20 @@ import kotlin.math.min
 private val DARK_OFF = 0xAA30303A.toInt()
 private val DARK_ON = 0xEE62627A.toInt()
 private val RIM = 0xBBFFFFFF.toInt()
-private val ARROW = 0xDDFFFFFF.toInt()
+private val ARROW_OFF = 0xDD202128.toInt()
+private val ARROW_ON = 0xFFFFFFFF.toInt()
 private val SHADOW = 0x66000000
 private val HIGHLIGHT = 0x44FFFFFF
+private val PRESS_OVERLAY = 0x66FFFFFF
 private val RED_LIGHT = 0xFFFF7A7A.toInt()
 private val RED_MID = 0xFFD32F2F.toInt()
 private val RED_DARK = 0xFF7F1414.toInt()
-private val PAD_TOP = 0xDD6A6A78.toInt()
-private val PAD_BOTTOM = 0xDD1C1C24.toInt()
+private val PAD_OUT_TOP = 0xE09A9CA8.toInt()
+private val PAD_OUT_BOTTOM = 0xE04A4C56.toInt()
+private val PAD_IN_TOP = 0xE07F818D.toInt()
+private val PAD_IN_BOTTOM = 0xE05B5D69.toInt()
+private val CENTER_IN = 0xFF1A1B21.toInt()
+private val CENTER_OUT = 0xFF4A4B55.toInt()
 
 class TouchOverlay(
     context: Context,
@@ -58,11 +64,14 @@ class TouchOverlay(
         KeyEvent.KEYCODE_DPAD_UP,
         KeyEvent.KEYCODE_DPAD_DOWN,
         KeyEvent.KEYCODE_DPAD_LEFT,
-        KeyEvent.KEYCODE_DPAD_RIGHT,
-        -1
+        KeyEvent.KEYCODE_DPAD_RIGHT
     )
-    private val armRects = Array(5) { RectF() }
-    private var padShader: Shader? = null
+    private val armRects = Array(4) { RectF() }
+    private var plusOuter = Path()
+    private var plusInner = Path()
+    private var outerShader: Shader? = null
+    private var innerShader: Shader? = null
+    private var centerShader: Shader? = null
 
     private var padX = 0f
     private var padY = 0f
@@ -74,7 +83,7 @@ class TouchOverlay(
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    private val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ARROW }
+    private val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFFFFFFF.toInt()
@@ -123,6 +132,21 @@ class TouchOverlay(
             Shader.TileMode.CLAMP
         )
 
+    private fun plusPath(cx: Float, cy: Float, half: Float, t: Float, corner: Float): Path {
+        val vert = Path()
+        vert.addRoundRect(
+            RectF(cx - t / 2, cy - half, cx + t / 2, cy + half),
+            corner, corner, Path.Direction.CW
+        )
+        val horiz = Path()
+        horiz.addRoundRect(
+            RectF(cx - half, cy - t / 2, cx + half, cy + t / 2),
+            corner, corner, Path.Direction.CW
+        )
+        vert.op(horiz, Path.Op.UNION)
+        return vert
+    }
+
     private fun layoutControls() {
         val w = width.toFloat()
         val h = height.toFloat()
@@ -135,7 +159,7 @@ class TouchOverlay(
         val margin = if (landscape) 0.07f * u else 0.14f * u
         val side = 0.05f * u
 
-        padR = (if (landscape) 0.25f else 0.21f) * u
+        padR = (if (landscape) 0.21f else 0.19f) * u
         padX = left + side + padR
         padY = bottom - margin - padR
 
@@ -144,10 +168,20 @@ class TouchOverlay(
         armRects[1].set(padX - th / 2, padY + th / 2, padX + th / 2, padY + padR)
         armRects[2].set(padX - padR, padY - th / 2, padX - th / 2, padY + th / 2)
         armRects[3].set(padX + th / 2, padY - th / 2, padX + padR, padY + th / 2)
-        armRects[4].set(padX - th / 2, padY - th / 2, padX + th / 2, padY + th / 2)
-        padShader = LinearGradient(
+
+        plusOuter = plusPath(padX, padY, padR, th, th * 0.3f)
+        plusInner = plusPath(padX, padY, padR * 0.93f, th * 0.78f, th * 0.24f)
+        outerShader = LinearGradient(
             0f, padY - padR, 0f, padY + padR,
-            PAD_TOP, PAD_BOTTOM, Shader.TileMode.CLAMP
+            PAD_OUT_TOP, PAD_OUT_BOTTOM, Shader.TileMode.CLAMP
+        )
+        innerShader = LinearGradient(
+            0f, padY - padR, 0f, padY + padR,
+            PAD_IN_TOP, PAD_IN_BOTTOM, Shader.TileMode.CLAMP
+        )
+        centerShader = RadialGradient(
+            padX, padY, th * 0.3f,
+            CENTER_IN, CENTER_OUT, Shader.TileMode.CLAMP
         )
 
         val r = 0.1f * u
@@ -163,11 +197,10 @@ class TouchOverlay(
         val pillW = 0.2f * u
         val pillH = 0.07f * u
         if (landscape) {
-            val selY = padY - padR - 0.1f * u
-            select.rect.set(padX - pillW / 2, selY - pillH / 2, padX + pillW / 2, selY + pillH / 2)
+            val rowY = min(padY - padR, buttonA.cy - r) - 0.1f * u
+            select.rect.set(padX - pillW / 2, rowY - pillH / 2, padX + pillW / 2, rowY + pillH / 2)
             val startX = (buttonA.cx + buttonB.cx) / 2
-            val startY = buttonA.cy - r - 0.1f * u
-            start.rect.set(startX - pillW / 2, startY - pillH / 2, startX + pillW / 2, startY + pillH / 2)
+            start.rect.set(startX - pillW / 2, rowY - pillH / 2, startX + pillW / 2, rowY + pillH / 2)
         } else {
             val pillY = bottom - 0.06f * u - pillH / 2
             val gap = 0.03f * u
@@ -196,7 +229,7 @@ class TouchOverlay(
         val dx = x - padX
         val dy = y - padY
         val dist = hypot(dx, dy)
-        if (dist <= padR * 1.2f && dist > padR * 0.12f) {
+        if (dist <= padR * 1.05f && dist > padR * 0.12f) {
             val t = padR * 0.3f
             if (dx < -t) out.add(KeyEvent.KEYCODE_DPAD_LEFT)
             if (dx > t) out.add(KeyEvent.KEYCODE_DPAD_RIGHT)
@@ -229,7 +262,11 @@ class TouchOverlay(
         }
     }
 
-    private fun arrow(canvas: Canvas, cx: Float, cy: Float, size: Float, dx: Float, dy: Float) {
+    private fun arrow(
+        canvas: Canvas, cx: Float, cy: Float, size: Float,
+        dx: Float, dy: Float, key: Int
+    ) {
+        arrowPaint.color = if (key in pressedKeys) ARROW_ON else ARROW_OFF
         val px = -dy
         val py = dx
         path.reset()
@@ -245,36 +282,41 @@ class TouchOverlay(
         stroke.strokeWidth = 0.006f * u
         stroke.color = RIM
         val th = padR * 0.62f
-        val corner = th * 0.22f
         val mid = (th / 2 + padR) / 2
-        val shadowOffset = 0.012f * u
 
-        // Croix directionnelle : ombre, relief, creux central, flèches
+        // Croix directionnelle : ombre, métal, biseau, creux central, flèches
         fill.shader = null
         fill.color = SHADOW
-        for (rect in armRects) {
-            canvas.drawRoundRect(
-                rect.left, rect.top + shadowOffset, rect.right, rect.bottom + shadowOffset,
-                corner, corner, fill
-            )
-        }
-        for (i in 0 until 5) {
+        canvas.save()
+        canvas.translate(0f, 0.012f * u)
+        canvas.drawPath(plusOuter, fill)
+        canvas.restore()
+
+        fill.shader = outerShader
+        canvas.drawPath(plusOuter, fill)
+        fill.shader = innerShader
+        canvas.drawPath(plusInner, fill)
+        fill.shader = null
+        canvas.drawPath(plusOuter, stroke)
+
+        for (i in 0 until 4) {
             if (armKeys[i] in pressedKeys) {
-                fill.shader = null
-                fill.color = DARK_ON
-            } else {
-                fill.shader = padShader
+                canvas.save()
+                canvas.clipPath(plusOuter)
+                fill.color = PRESS_OVERLAY
+                canvas.drawRect(armRects[i], fill)
+                canvas.restore()
             }
-            canvas.drawRoundRect(armRects[i], corner, corner, fill)
-            fill.shader = null
-            canvas.drawRoundRect(armRects[i], corner, corner, stroke)
         }
-        fill.color = 0x66000000
-        canvas.drawCircle(padX, padY, th * 0.28f, fill)
-        arrow(canvas, padX, padY - mid, th * 0.22f, 0f, -1f)
-        arrow(canvas, padX, padY + mid, th * 0.22f, 0f, 1f)
-        arrow(canvas, padX - mid, padY, th * 0.22f, -1f, 0f)
-        arrow(canvas, padX + mid, padY, th * 0.22f, 1f, 0f)
+
+        fill.shader = centerShader
+        canvas.drawCircle(padX, padY, th * 0.3f, fill)
+        fill.shader = null
+
+        arrow(canvas, padX, padY - mid, th * 0.2f, 0f, -1f, KeyEvent.KEYCODE_DPAD_UP)
+        arrow(canvas, padX, padY + mid, th * 0.2f, 0f, 1f, KeyEvent.KEYCODE_DPAD_DOWN)
+        arrow(canvas, padX - mid, padY, th * 0.2f, -1f, 0f, KeyEvent.KEYCODE_DPAD_LEFT)
+        arrow(canvas, padX + mid, padY, th * 0.2f, 1f, 0f, KeyEvent.KEYCODE_DPAD_RIGHT)
 
         // Boutons A et B
         text.textSize = 0.065f * u
