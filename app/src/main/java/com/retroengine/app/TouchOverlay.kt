@@ -135,7 +135,7 @@ class TouchOverlay(
         val margin = if (landscape) 0.07f * u else 0.14f * u
         val side = 0.05f * u
 
-        padR = 0.18f * u
+        padR = (if (landscape) 0.25f else 0.21f) * u
         padX = left + side + padR
         padY = bottom - margin - padR
 
@@ -196,7 +196,7 @@ class TouchOverlay(
         val dx = x - padX
         val dy = y - padY
         val dist = hypot(dx, dy)
-        if (dist <= padR * 1.3f && dist > padR * 0.12f) {
+        if (dist <= padR * 1.2f && dist > padR * 0.12f) {
             val t = padR * 0.3f
             if (dx < -t) out.add(KeyEvent.KEYCODE_DPAD_LEFT)
             if (dx > t) out.add(KeyEvent.KEYCODE_DPAD_RIGHT)
