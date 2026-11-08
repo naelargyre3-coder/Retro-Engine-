@@ -184,7 +184,7 @@ class TouchOverlay(
             CENTER_IN, CENTER_OUT, Shader.TileMode.CLAMP
         )
 
-        val r = 0.1f * u
+        val r = 0.09f * u
         buttonA.r = r
         buttonA.cx = right - side - r
         buttonA.cy = bottom - margin - 2.3f * r
@@ -196,7 +196,7 @@ class TouchOverlay(
 
         val pillW = 0.2f * u
         val pillH = 0.07f * u
-        if (landscape) {
+        if (false) {
             val rowY = min(padY - padR, buttonA.cy - r) - 0.1f * u
             select.rect.set(padX - pillW / 2, rowY - pillH / 2, padX + pillW / 2, rowY + pillH / 2)
             val startX = (buttonA.cx + buttonB.cx) / 2
