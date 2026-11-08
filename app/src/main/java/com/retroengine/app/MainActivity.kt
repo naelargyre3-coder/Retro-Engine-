@@ -1,9 +1,14 @@
 package com.retroengine.app
 
+import android.content.Context
+import android.hardware.input.InputManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
+import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
@@ -27,8 +32,26 @@ import java.security.MessageDigest
 class MainActivity : ComponentActivity() {
 
     private var retroView: GLRetroView? = null
+    private var touchOverlay: TouchOverlay? = null
+    private var overlayHidden = false
     private var sramFile: File? = null
     private var lastSram: ByteArray? = null
+    private var inputManager: InputManager? = null
+
+    // Etat des 4 directions envoyees par stick ou croix de la manette
+    private val dirState = BooleanArray(4)
+    private val dirKeys = intArrayOf(
+        KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT,
+        KeyEvent.KEYCODE_DPAD_UP,
+        KeyEvent.KEYCODE_DPAD_DOWN
+    )
+
+    private val deviceListener = object : InputManager.InputDeviceListener {
+        override fun onInputDeviceAdded(deviceId: Int) = updateOverlay()
+        override fun onInputDeviceRemoved(deviceId: Int) = updateOverlay()
+        override fun onInputDeviceChanged(deviceId: Int) = updateOverlay()
+    }
 
     private val pickRom =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -65,6 +88,100 @@ class MainActivity : ComponentActivity() {
         setContentView(root)
     }
 
+    override fun onDestroy() {
+        inputManager?.unregisterInputDeviceListener(deviceListener)
+        super.onDestroy()
+    }
+
+    // ---------- Manettes ----------
+
+    private fun isGamepadSource(source: Int): Boolean =
+        (source and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+            (source and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+
+    private fun hasGamepad(): Boolean =
+        InputDevice.getDeviceIds().any { id ->
+            val device = InputDevice.getDevice(id)
+            device != null && !device.isVirtual && isGamepadSource(device.sources)
+        }
+
+    private fun mapPadKey(keyCode: Int): Int? = when (keyCode) {
+        KeyEvent.KEYCODE_DPAD_UP,
+        KeyEvent.KEYCODE_DPAD_DOWN,
+        KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT -> keyCode
+        KeyEvent.KEYCODE_BUTTON_A,
+        KeyEvent.KEYCODE_BUTTON_X -> KeyEvent.KEYCODE_BUTTON_B
+        KeyEvent.KEYCODE_BUTTON_B,
+        KeyEvent.KEYCODE_BUTTON_Y -> KeyEvent.KEYCODE_BUTTON_A
+        KeyEvent.KEYCODE_BUTTON_START -> KeyEvent.KEYCODE_BUTTON_START
+        KeyEvent.KEYCODE_BUTTON_SELECT -> KeyEvent.KEYCODE_BUTTON_SELECT
+        else -> null
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val view = retroView
+        if (view != null && isGamepadSource(event.source)) {
+            val mapped = mapPadKey(event.keyCode)
+            if (mapped != null) {
+                if (event.repeatCount == 0 &&
+                    (event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP)
+                ) {
+                    view.sendKeyEvent(event.action, mapped, 0)
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun setDirection(index: Int, on: Boolean) {
+        if (dirState[index] == on) return
+        dirState[index] = on
+        val action = if (on) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
+        retroView?.sendKeyEvent(action, dirKeys[index], 0)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (retroView != null && isGamepadSource(event.source) &&
+            event.actionMasked == MotionEvent.ACTION_MOVE
+        ) {
+            val x = event.getAxisValue(MotionEvent.AXIS_X)
+            val y = event.getAxisValue(MotionEvent.AXIS_Y)
+            val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+            val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+            setDirection(0, x < -0.5f || hatX < -0.5f)
+            setDirection(1, x > 0.5f || hatX > 0.5f)
+            setDirection(2, y < -0.5f || hatY < -0.5f)
+            setDirection(3, y > 0.5f || hatY > 0.5f)
+            return true
+        }
+        return super.dispatchGenericMotionEvent(event)
+    }
+
+    private fun updateOverlay() {
+        val overlay = touchOverlay ?: return
+        val hide = hasGamepad()
+        if (hide == overlayHidden) return
+        overlayHidden = hide
+        if (hide) {
+            overlay.releaseAll()
+            overlay.animate()
+                .alpha(0f).scaleX(0.92f).scaleY(0.92f)
+                .setDuration(250)
+                .withEndAction { if (overlayHidden) overlay.visibility = View.GONE }
+                .start()
+        } else {
+            overlay.visibility = View.VISIBLE
+            overlay.animate()
+                .alpha(1f).scaleX(1f).scaleY(1f)
+                .setDuration(250)
+                .start()
+        }
+    }
+
+    // ---------- Sauvegardes ----------
+
     private suspend fun persistSram() {
         val view = retroView ?: return
         val file = sramFile ?: return
@@ -80,6 +197,8 @@ class MainActivity : ComponentActivity() {
             // On reessaiera au prochain passage
         }
     }
+
+    // ---------- Jeu ----------
 
     private fun startGame(uri: Uri) {
         val rom = File(cacheDir, "rom.nes")
@@ -123,6 +242,8 @@ class MainActivity : ComponentActivity() {
             val action = if (pressed) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
             view.sendKeyEvent(action, keyCode, 0)
         }
+        touchOverlay = overlay
+        overlayHidden = false
 
         val frame = FrameLayout(this)
         frame.addView(
@@ -140,6 +261,12 @@ class MainActivity : ComponentActivity() {
             )
         )
         setContentView(frame)
+
+        // Masquage automatique des touches tactiles selon les manettes connectees
+        val manager = getSystemService(Context.INPUT_SERVICE) as InputManager
+        inputManager = manager
+        manager.registerInputDeviceListener(deviceListener, null)
+        updateOverlay()
 
         // Sauvegarde automatique toutes les 3 secondes pendant le jeu
         lifecycleScope.launch {
