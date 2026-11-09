@@ -29,5 +29,8 @@
         <activity
             android:name=".GraphicsConfigActivity"
             android:exported="false" />
+            <activity
+            android:name=".IconCropActivity"
+            android:exported="false" />
     </application>
 </manifest>
