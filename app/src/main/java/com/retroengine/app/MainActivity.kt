@@ -1,6 +1,7 @@
 package com.retroengine.app
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -129,6 +130,16 @@ class MainActivity : ComponentActivity() {
             textSize = 13f
             setTextColor(0xFFB0B8FF.toInt())
         }
+                val iconView = ImageView(this).apply {
+            val file = library.iconFile(game.id)
+            if (file.exists()) setImageBitmap(BitmapFactory.decodeFile(file.path))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            background = GradientDrawable().apply {
+                setColor(0xFF000000.toInt())
+                cornerRadius = dp(12).toFloat()
+            }
+            clipToOutline = true
+                }
         val texts = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(title)
@@ -153,6 +164,7 @@ class MainActivity : ComponentActivity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14), dp(10), dp(10), dp(10))
             this.background = background
+            addView(iconView, LinearLayout.LayoutParams(dp(56), dp(56)).apply { rightMargin = dp(12) })
             addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             addView(edit)
             setOnClickListener {
