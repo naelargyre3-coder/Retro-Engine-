@@ -22,7 +22,8 @@ class GameLibrary(private val context: Context) {
     private val indexFile = File(root, "games.json")
 
     fun romFile(id: String): File = File(File(root, id), "rom.nes")
-
+    fun iconFile(id: String): File = File(File(root, id), "icon.png")
+    
     fun hasSave(id: String): Boolean =
         File(File(context.filesDir, "saves"), "$id.sram").exists()
 
