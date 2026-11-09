@@ -2,27 +2,71 @@ package com.retroengine.app
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import java.io.File
 
 class GameDetailActivity : ComponentActivity() {
 
     private lateinit var library: GameLibrary
     private lateinit var gameId: String
     private lateinit var nameInput: EditText
+    private lateinit var iconPreview: ImageView
+    private lateinit var removeLogoButton: Button
     private var originalName = ""
 
+    private val pickImage =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                if (prepareSource(uri)) {
+                    startActivity(
+                        Intent(this, IconCropActivity::class.java).putExtra("gameId", gameId)
+                    )
+                } else {
+                    Toast.makeText(this, "Image illisible.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun prepareSource(uri: Uri): Boolean {
+        return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, bounds)
+            }
+            var sample = 1
+            while (bounds.outWidth / sample > 1600 || bounds.outHeight / sample > 1600) sample *= 2
+            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+            val bmp = contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, opts)
+            } ?: return false
+            File(cacheDir, "icon_source.png").outputStream().use {
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,8 +109,29 @@ class GameDetailActivity : ComponentActivity() {
             text = "Console : ${game.console}"
             textSize = 14f
             setTextColor(0xFFB0B8FF.toInt())
-            setPadding(0, dp(8), 0, dp(16))
+            setPadding(0, dp(8), 0, dp(8))
         })
+
+        // Logo
+        column.addView(TextView(this).apply {
+            text = "Logo du jeu"
+            textSize = 14f
+            setTextColor(0xFF9FA8FF.toInt())
+            setPadding(0, dp(8), 0, dp(4))
+        })
+        iconPreview = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            background = GradientDrawable().apply {
+                setColor(0xFF12132B.toInt())
+                cornerRadius = dp(20).toFloat()
+                setStroke(dp(1), 0x55FFFFFF)
+            }
+            clipToOutline = true
+        }
+        column.addView(
+            iconPreview,
+            LinearLayout.LayoutParams(dp(96), dp(96)).apply { bottomMargin = dp(8) }
+        )
 
         val matchWidth = {
             LinearLayout.LayoutParams(
@@ -74,6 +139,23 @@ class GameDetailActivity : ComponentActivity() {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         }
+
+        column.addView(Button(this).apply {
+            text = "Choisir un logo"
+            setOnClickListener {
+                saveName()
+                pickImage.launch(arrayOf("image/png", "image/jpeg"))
+            }
+        }, matchWidth())
+
+        removeLogoButton = Button(this).apply {
+            text = "Retirer le logo"
+            setOnClickListener {
+                library.iconFile(gameId).delete()
+                refreshIcon()
+            }
+        }
+        column.addView(removeLogoButton, matchWidth())
 
         column.addView(Button(this).apply {
             text = "Jouer"
@@ -85,7 +167,7 @@ class GameDetailActivity : ComponentActivity() {
                 )
                 finish()
             }
-        }, matchWidth())
+        }, matchWidth().apply { topMargin = dp(16) })
 
         column.addView(Button(this).apply {
             text = "Supprimer le jeu"
@@ -110,6 +192,23 @@ class GameDetailActivity : ComponentActivity() {
             insets
         }
         setContentView(scroll)
+        refreshIcon()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::iconPreview.isInitialized) refreshIcon()
+    }
+
+    private fun refreshIcon() {
+        val file = library.iconFile(gameId)
+        if (file.exists()) {
+            iconPreview.setImageBitmap(BitmapFactory.decodeFile(file.path))
+            removeLogoButton.isEnabled = true
+        } else {
+            iconPreview.setImageDrawable(null)
+            removeLogoButton.isEnabled = false
+        }
     }
 
     private fun saveName() {
@@ -130,7 +229,7 @@ class GameDetailActivity : ComponentActivity() {
         AlertDialog.Builder(this)
             .setTitle("Supprimer ce jeu ?")
             .setMessage(
-                "La copie de la ROM et les sauvegardes de ce jeu seront supprimées de Retro Engine. " +
+                "La copie de la ROM, le logo et les sauvegardes de ce jeu seront supprimés de Retro Engine. " +
                     "Le fichier d'origine sur ton téléphone n'est pas touché."
             )
             .setPositiveButton("Supprimer") { _, _ ->
