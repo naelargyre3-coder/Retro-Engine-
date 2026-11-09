@@ -85,7 +85,11 @@ class MainActivity : ComponentActivity() {
             }
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         column.addView(row, matchWidth())
-
+        column.addView(Button(this).apply {
+            text = "Test : créer une copie signée"
+            setOnClickListener { GenerationTest.run(this@MainActivity) }
+        }, matchWidth())
+        
         val scroll = ScrollView(this).apply {
             setBackgroundColor(0xFF010317.toInt())
             addView(column)
