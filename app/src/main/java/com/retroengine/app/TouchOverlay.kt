@@ -41,6 +41,7 @@ private val CENTER_OUT = 0xFF4A4B55.toInt()
 
 class TouchOverlay(
     context: Context,
+    private val skin: ConsoleSkin = GameConsole.NES.skin,
     private val onKey: (keyCode: Int, pressed: Boolean) -> Unit
 ) : View(context) {
 
@@ -123,11 +124,13 @@ class TouchOverlay(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         layoutControls()
     }
-
+    private fun colorsFor(b: RoundButton): ButtonColors =
+        if (b.key == KeyEvent.KEYCODE_BUTTON_A) skin.a else skin.b
+   
     private fun makeShader(b: RoundButton): Shader =
         RadialGradient(
             b.cx - b.r * 0.3f, b.cy - b.r * 0.3f, b.r * 1.3f,
-            intArrayOf(RED_LIGHT, RED_MID, RED_DARK),
+            intArrayOf(colorsFor(b).light, colorsFor(b).mid, colorsFor(b).dark),
             floatArrayOf(0f, 0.55f, 1f),
             Shader.TileMode.CLAMP
         )
