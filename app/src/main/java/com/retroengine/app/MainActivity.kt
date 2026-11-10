@@ -117,7 +117,7 @@ class MainActivity : ComponentActivity() {
         val games = library.all()
         if (games.isEmpty()) {
             listContainer.addView(TextView(this).apply {
-                text = "Aucun jeu pour l'instant. Ajoute une ROM NES, Game Boy ou Game Boy Color."
+                text = "Aucun jeu pour l'instant. Ajoute une ROM NES, SNES, Game Boy, Game Boy Color ou GBA."
                 textSize = 14f
                 setTextColor(0xFF9FA8FF.toInt())
                 setPadding(0, dp(4), 0, dp(16))
