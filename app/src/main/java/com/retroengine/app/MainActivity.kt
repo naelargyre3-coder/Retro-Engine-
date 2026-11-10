@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
         column.addView(listContainer, matchWidth())
 
         column.addView(Button(this).apply {
-            text = "Ajouter un jeu (ROM NES)"
+            text = "Ajouter un jeu"
             setOnClickListener { pickRom.launch(arrayOf("*/*")) }
         }, matchWidth())
 
@@ -117,7 +117,7 @@ class MainActivity : ComponentActivity() {
         val games = library.all()
         if (games.isEmpty()) {
             listContainer.addView(TextView(this).apply {
-                text = "Aucun jeu pour l'instant. Ajoute une ROM NES pour commencer."
+                text = "Aucun jeu pour l'instant. Ajoute une ROM NES, Game Boy ou Game Boy Color."
                 textSize = 14f
                 setTextColor(0xFF9FA8FF.toInt())
                 setPadding(0, dp(4), 0, dp(16))
