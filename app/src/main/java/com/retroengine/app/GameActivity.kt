@@ -183,8 +183,6 @@ class GameActivity : ComponentActivity() {
             ).show()
         }
 
-        mapping = ControllerMapping(this)
-
         val saves = File(filesDir, "saves").apply { mkdirs() }
         val sram = File(saves, "$gameId.sram")
         sramFile = sram
@@ -197,6 +195,7 @@ class GameActivity : ComponentActivity() {
             GameConsole.fromLabel(GameLibrary(this).get(gameId)?.console)
         } 
         val data = GLRetroViewData(this).apply {
+            mapping = ControllerMapping(this, console.buttonSet)  
             coreFilePath = console.coreLib
             gameFilePath = rom.absolutePath
             systemDirectory = filesDir.absolutePath
@@ -208,7 +207,7 @@ class GameActivity : ComponentActivity() {
         retroView = view
         lifecycle.addObserver(view)
 
-            val overlay = TouchOverlay(this, console.skin) { keyCode, pressed ->
+            val overlay = TouchOverlay(this, console) { keyCode, pressed ->
             val action = if (pressed) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
             view.sendKeyEvent(action, keyCode, 0)
         }
