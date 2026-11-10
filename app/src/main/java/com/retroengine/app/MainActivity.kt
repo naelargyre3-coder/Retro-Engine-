@@ -39,6 +39,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+              if (EmbeddedGame.load(this) != null) {
+            startActivity(Intent(this, GameActivity::class.java).putExtra("embedded", true))
+            finish()
+            return
+              } 
         library = GameLibrary(this)
 
         val column = LinearLayout(this).apply {
