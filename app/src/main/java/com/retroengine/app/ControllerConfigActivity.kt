@@ -15,30 +15,59 @@ import androidx.core.view.WindowInsetsCompat
 
 class ControllerConfigActivity : ComponentActivity() {
 
+    private var set = ButtonSet.TWO
     private lateinit var mapping: ControllerMapping
     private lateinit var status: TextView
     private lateinit var lastPressed: TextView
-    private var waiting: NesAction? = null
-    private val valueViews = HashMap<NesAction, TextView>()
-    private val actionButtons = HashMap<NesAction, Button>()
+    private var waiting: PadAction? = null
+    private val valueViews = HashMap<PadAction, TextView>()
+    private val actionButtons = HashMap<PadAction, Button>()
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        mapping = ControllerMapping(this)
+        render()
+    }
+
+    private fun selectorButton(label: String, target: ButtonSet): Button = Button(this).apply {
+        text = label
+        isEnabled = (set != target)
+        setOnClickListener {
+            set = target
+            render()
+        }
+    }
+
+    private fun render() {
+        mapping = ControllerMapping(this, set)
+        waiting = null
+        valueViews.clear()
+        actionButtons.clear()
 
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(20), dp(20), dp(20))
         }
-
         column.addView(TextView(this).apply {
             text = "Configurer la manette"
             textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(0xFFFFFFFF.toInt())
         })
+
+        val selector = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val selectorParams = { LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) }
+        selector.addView(selectorButton("NES / GB", ButtonSet.TWO), selectorParams())
+        selector.addView(selectorButton("GBA", ButtonSet.TWO_SHOULDER), selectorParams())
+        selector.addView(selectorButton("SNES", ButtonSet.FOUR_SHOULDER), selectorParams())
+        column.addView(
+            selector,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(8) }
+        )
 
         status = TextView(this).apply {
             textSize = 14f
@@ -55,12 +84,14 @@ class ControllerConfigActivity : ComponentActivity() {
         }
         column.addView(lastPressed)
 
-        for (action in NesAction.values()) addRow(column, action)
+        for (action in mapping.actionList()) addRow(column, action)
 
-        val matchWidth = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        )
+        val matchWidth = {
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
 
         column.addView(Button(this).apply {
             text = "Inverser A / B"
@@ -69,7 +100,7 @@ class ControllerConfigActivity : ComponentActivity() {
                 mapping.swapAB()
                 refresh()
             }
-        }, matchWidth)
+        }, matchWidth())
 
         column.addView(Button(this).apply {
             text = "R\u00e9initialiser"
@@ -78,12 +109,12 @@ class ControllerConfigActivity : ComponentActivity() {
                 mapping.reset()
                 refresh()
             }
-        }, matchWidth)
+        }, matchWidth())
 
         column.addView(Button(this).apply {
             text = "Termin\u00e9"
             setOnClickListener { finish() }
-        }, matchWidth)
+        }, matchWidth())
 
         val scroll = ScrollView(this).apply {
             setBackgroundColor(0xFF010317.toInt())
@@ -100,10 +131,10 @@ class ControllerConfigActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        refresh()
+        if (::mapping.isInitialized) refresh()
     }
 
-    private fun addRow(parent: LinearLayout, action: NesAction) {
+    private fun addRow(parent: LinearLayout, action: PadAction) {
         val label = TextView(this).apply {
             text = action.label
             textSize = 18f
@@ -147,7 +178,7 @@ class ControllerConfigActivity : ComponentActivity() {
         } else {
             "Aucune manette d\u00e9tect\u00e9e : branche ou connecte une manette"
         }
-        for (action in NesAction.values()) {
+        for (action in mapping.actionList()) {
             valueViews[action]?.text =
                 if (waiting == action) "Appuie sur un bouton de la manette\u2026" else mapping.describe(action)
             actionButtons[action]?.text = if (waiting == action) "Annuler" else "Changer"
