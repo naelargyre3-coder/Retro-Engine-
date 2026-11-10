@@ -30,6 +30,7 @@ class GameActivity : ComponentActivity() {
     private var lastSram: ByteArray? = null
     private var inputManager: InputManager? = null
     private var mapping: ControllerMapping? = null
+    private var embedded: EmbeddedConfig? = null
 
     private val dirState = BooleanArray(4)
     private val dirKeys = intArrayOf(
@@ -47,8 +48,23 @@ class GameActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val gameId = intent.getStringExtra("gameId")
-        val rom = if (gameId != null) GameLibrary(this).romFile(gameId) else null
+        val cfg = if (intent.getBooleanExtra("embedded", false)) EmbeddedGame.load(this) else null
+        embedded = cfg
+
+        val gameId: String?
+        val rom: File?
+        if (cfg != null) {
+            gameId = cfg.id
+            rom = try {
+                EmbeddedGame.romFile(this, cfg)
+            } catch (e: Exception) {
+                null
+            }
+        } else {
+            gameId = intent.getStringExtra("gameId")
+            rom = if (gameId != null) GameLibrary(this).romFile(gameId) else null
+        }
+
         if (gameId == null || rom == null || !rom.exists()) {
             Toast.makeText(this, "ROM introuvable.", Toast.LENGTH_LONG).show()
             finish()
@@ -150,11 +166,22 @@ class GameActivity : ComponentActivity() {
     // ---------- Jeu ----------
 
     private fun startGame(gameId: String, rom: File) {
-        requestedOrientation = GraphicsSettings.orientationFlag(this)
-        val shaderConfig = GraphicsSettings.shaderConfig(this)
-        Toast.makeText(
-            this, "Filtre : ${GraphicsSettings.filter(this).label}", Toast.LENGTH_SHORT
-        ).show()
+        val cfg = embedded
+        requestedOrientation = if (cfg != null) {
+            EmbeddedGame.orientationFlag(cfg)
+        } else {
+            GraphicsSettings.orientationFlag(this)
+        }
+        val shaderConfig = if (cfg != null) {
+            EmbeddedGame.shader(cfg)
+        } else {
+            GraphicsSettings.shaderConfig(this)
+        }
+        if (cfg == null) {
+            Toast.makeText(
+                this, "Filtre : ${GraphicsSettings.filter(this).label}", Toast.LENGTH_SHORT
+            ).show()
+        }
 
         mapping = ControllerMapping(this)
 
