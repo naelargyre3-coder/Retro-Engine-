@@ -29,9 +29,6 @@ private val ARROW_ON = 0xFFFFFFFF.toInt()
 private val SHADOW = 0x66000000
 private val HIGHLIGHT = 0x44FFFFFF
 private val PRESS_OVERLAY = 0x66FFFFFF
-private val RED_LIGHT = 0xFFFF7A7A.toInt()
-private val RED_MID = 0xFFD32F2F.toInt()
-private val RED_DARK = 0xFF7F1414.toInt()
 private val PAD_OUT_TOP = 0xE09A9CA8.toInt()
 private val PAD_OUT_BOTTOM = 0xE04A4C56.toInt()
 private val PAD_IN_TOP = 0xE07F818D.toInt()
@@ -41,11 +38,11 @@ private val CENTER_OUT = 0xFF4A4B55.toInt()
 
 class TouchOverlay(
     context: Context,
-    private val skin: ConsoleSkin = GameConsole.NES.skin,
+    private val console: GameConsole,
     private val onKey: (keyCode: Int, pressed: Boolean) -> Unit
 ) : View(context) {
 
-    private class RoundButton(val key: Int, val label: String) {
+    private class RoundButton(val key: Int, val label: String, val colors: ButtonColors) {
         var cx = 0f
         var cy = 0f
         var r = 0f
@@ -56,10 +53,32 @@ class TouchOverlay(
         val rect = RectF()
     }
 
-    private val buttonA = RoundButton(KeyEvent.KEYCODE_BUTTON_A, "A")
-    private val buttonB = RoundButton(KeyEvent.KEYCODE_BUTTON_B, "B")
+    private val skin = console.skin
+    private val four = console.buttonSet == ButtonSet.FOUR_SHOULDER
+    private val hasShoulders = console.buttonSet != ButtonSet.TWO
+
+    private val faces: List<RoundButton> = if (four) {
+        listOf(
+            RoundButton(KeyEvent.KEYCODE_BUTTON_X, "X", skin.x),
+            RoundButton(KeyEvent.KEYCODE_BUTTON_Y, "Y", skin.y),
+            RoundButton(KeyEvent.KEYCODE_BUTTON_A, "A", skin.a),
+            RoundButton(KeyEvent.KEYCODE_BUTTON_B, "B", skin.b)
+        )
+    } else {
+        listOf(
+            RoundButton(KeyEvent.KEYCODE_BUTTON_A, "A", skin.a),
+            RoundButton(KeyEvent.KEYCODE_BUTTON_B, "B", skin.b)
+        )
+    }
     private val select = PillButton(KeyEvent.KEYCODE_BUTTON_SELECT, "SELECT")
     private val start = PillButton(KeyEvent.KEYCODE_BUTTON_START, "START")
+    private val shoulderL = PillButton(KeyEvent.KEYCODE_BUTTON_L1, "L")
+    private val shoulderR = PillButton(KeyEvent.KEYCODE_BUTTON_R1, "R")
+    private val pills: List<PillButton> = if (hasShoulders) {
+        listOf(select, start, shoulderL, shoulderR)
+    } else {
+        listOf(select, start)
+    }
 
     private val armKeys = intArrayOf(
         KeyEvent.KEYCODE_DPAD_UP,
@@ -124,13 +143,11 @@ class TouchOverlay(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         layoutControls()
     }
-    private fun colorsFor(b: RoundButton): ButtonColors =
-        if (b.key == KeyEvent.KEYCODE_BUTTON_A) skin.a else skin.b
-   
+
     private fun makeShader(b: RoundButton): Shader =
         RadialGradient(
             b.cx - b.r * 0.3f, b.cy - b.r * 0.3f, b.r * 1.3f,
-            intArrayOf(colorsFor(b).light, colorsFor(b).mid, colorsFor(b).dark),
+            intArrayOf(b.colors.light, b.colors.mid, b.colors.dark),
             floatArrayOf(0f, 0.55f, 1f),
             Shader.TileMode.CLAMP
         )
@@ -187,29 +204,56 @@ class TouchOverlay(
             CENTER_IN, CENTER_OUT, Shader.TileMode.CLAMP
         )
 
-        val r = 0.09f * u
-        buttonA.r = r
-        buttonA.cx = right - side - r
-        buttonA.cy = bottom - margin - 2.3f * r
-        buttonB.r = r
-        buttonB.cx = buttonA.cx - 2.3f * r
-        buttonB.cy = bottom - margin - r
-        buttonA.shader = makeShader(buttonA)
-        buttonB.shader = makeShader(buttonB)
+        if (four) {
+            val r = 0.078f * u
+            val off = 1.75f * r
+            val ccx = right - side - (off + r)
+            val ccy = bottom - margin - (off + r)
+            for (b in faces) {
+                b.r = r
+                when (b.key) {
+                    KeyEvent.KEYCODE_BUTTON_X -> { b.cx = ccx; b.cy = ccy - off }
+                    KeyEvent.KEYCODE_BUTTON_B -> { b.cx = ccx; b.cy = ccy + off }
+                    KeyEvent.KEYCODE_BUTTON_Y -> { b.cx = ccx - off; b.cy = ccy }
+                    else -> { b.cx = ccx + off; b.cy = ccy }
+                }
+            }
+        } else {
+            val r = 0.09f * u
+            val a = faces[0]
+            val b = faces[1]
+            a.r = r
+            a.cx = right - side - r
+            a.cy = bottom - margin - 2.3f * r
+            b.r = r
+            b.cx = a.cx - 2.3f * r
+            b.cy = bottom - margin - r
+        }
+        for (b in faces) b.shader = makeShader(b)
 
         val pillW = 0.2f * u
         val pillH = 0.07f * u
-        if (false) {
-            val rowY = min(padY - padR, buttonA.cy - r) - 0.1f * u
-            select.rect.set(padX - pillW / 2, rowY - pillH / 2, padX + pillW / 2, rowY + pillH / 2)
-            val startX = (buttonA.cx + buttonB.cx) / 2
-            start.rect.set(startX - pillW / 2, rowY - pillH / 2, startX + pillW / 2, rowY + pillH / 2)
-        } else {
-            val pillY = bottom - 0.06f * u - pillH / 2
-            val gap = 0.03f * u
-            val cx = (left + right) / 2
-            select.rect.set(cx - gap - pillW, pillY - pillH / 2, cx - gap, pillY + pillH / 2)
-            start.rect.set(cx + gap, pillY - pillH / 2, cx + gap + pillW, pillY + pillH / 2)
+        val pillY = bottom - 0.06f * u - pillH / 2
+        val gap = 0.03f * u
+        val cx = (left + right) / 2
+        select.rect.set(cx - gap - pillW, pillY - pillH / 2, cx - gap, pillY + pillH / 2)
+        start.rect.set(cx + gap, pillY - pillH / 2, cx + gap + pillW, pillY + pillH / 2)
+
+        if (hasShoulders) {
+            val shW = 0.24f * u
+            val faceLeft = faces.minOf { it.cx - it.r }
+            val faceRight = faces.maxOf { it.cx + it.r }
+            val faceTop = faces.minOf { it.cy - it.r }
+            val faceCx = (faceLeft + faceRight) / 2
+            if (landscape) {
+                val y = 0.05f * u
+                shoulderL.rect.set(left + side, y, left + side + shW, y + pillH)
+                shoulderR.rect.set(right - side - shW, y, right - side, y + pillH)
+            } else {
+                val top = min(padY - padR, faceTop) - 0.04f * u - pillH
+                shoulderL.rect.set(padX - shW / 2, top, padX + shW / 2, top + pillH)
+                shoulderR.rect.set(faceCx - shW / 2, top, faceCx + shW / 2, top + pillH)
+            }
         }
     }
 
@@ -241,23 +285,26 @@ class TouchOverlay(
         }
         var best: RoundButton? = null
         var bestDist = Float.MAX_VALUE
-        for (b in listOf(buttonA, buttonB)) {
+        val factor = if (four) 1.25f else 1.35f
+        for (b in faces) {
             val d = hypot(x - b.cx, y - b.cy)
-            if (d <= b.r * 1.35f && d < bestDist) {
+            if (d <= b.r * factor && d < bestDist) {
                 best = b
                 bestDist = d
             }
         }
         if (best != null) out.add(best.key)
-        for (p in listOf(select, start)) {
+        for (p in pills) {
             val zone = RectF(p.rect)
             zone.inset(-p.rect.width() * 0.1f, -p.rect.height() * 0.35f)
             if (zone.contains(x, y)) out.add(p.key)
         }
     }
+
     fun releaseAll() {
         update(emptySet())
     }
+
     private fun update(now: Set<Int>) {
         for (k in now) if (k !in pressedKeys) onKey(k, true)
         for (k in pressedKeys) if (k !in now) onKey(k, false)
@@ -289,7 +336,7 @@ class TouchOverlay(
         val th = padR * 0.62f
         val mid = (th / 2 + padR) / 2
 
-        // Croix directionnelle : ombre, métal, biseau, creux central, flèches
+        // Croix directionnelle
         fill.shader = null
         fill.color = SHADOW
         canvas.save()
@@ -323,9 +370,9 @@ class TouchOverlay(
         arrow(canvas, padX - mid, padY, th * 0.2f, -1f, 0f, KeyEvent.KEYCODE_DPAD_LEFT)
         arrow(canvas, padX + mid, padY, th * 0.2f, 1f, 0f, KeyEvent.KEYCODE_DPAD_RIGHT)
 
-        // Boutons A et B
-        text.textSize = 0.065f * u
-        for (b in listOf(buttonA, buttonB)) {
+        // Boutons de face
+        for (b in faces) {
+            text.textSize = b.r * 0.72f
             val on = b.key in pressedKeys
             canvas.save()
             if (on) canvas.scale(0.94f, 0.94f, b.cx, b.cy)
@@ -346,9 +393,9 @@ class TouchOverlay(
             canvas.restore()
         }
 
-        // Select et Start
+        // Select, Start et gachettes
         text.textSize = 0.032f * u
-        for (p in listOf(select, start)) {
+        for (p in pills) {
             fill.color = if (p.key in pressedKeys) DARK_ON else DARK_OFF
             val radius = p.rect.height() / 2
             canvas.drawRoundRect(p.rect, radius, radius, fill)
