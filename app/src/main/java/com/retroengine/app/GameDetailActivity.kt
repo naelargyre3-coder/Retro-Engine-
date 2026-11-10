@@ -156,7 +156,15 @@ class GameDetailActivity : ComponentActivity() {
             }
         }
         column.addView(removeLogoButton, matchWidth())
-
+               
+        column.addView(Button(this).apply {
+            text = "Générer l'APK du jeu"
+            setOnClickListener {
+                saveName()
+                GameApkFlow.generate(this@GameDetailActivity, gameId)
+            }
+        }, matchWidth().apply { topMargin = dp(16) })
+      
         column.addView(Button(this).apply {
             text = "Jouer"
             setOnClickListener {
