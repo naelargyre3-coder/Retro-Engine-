@@ -5,15 +5,57 @@ import android.content.SharedPreferences
 import android.view.InputDevice
 import android.view.KeyEvent
 
-enum class NesAction(val label: String, val retroKey: Int, val defaults: List<Int>) {
-    UP("Haut", KeyEvent.KEYCODE_DPAD_UP, listOf(KeyEvent.KEYCODE_DPAD_UP)),
-    DOWN("Bas", KeyEvent.KEYCODE_DPAD_DOWN, listOf(KeyEvent.KEYCODE_DPAD_DOWN)),
-    LEFT("Gauche", KeyEvent.KEYCODE_DPAD_LEFT, listOf(KeyEvent.KEYCODE_DPAD_LEFT)),
-    RIGHT("Droite", KeyEvent.KEYCODE_DPAD_RIGHT, listOf(KeyEvent.KEYCODE_DPAD_RIGHT)),
-    A("A", KeyEvent.KEYCODE_BUTTON_A, listOf(KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Y)),
-    B("B", KeyEvent.KEYCODE_BUTTON_B, listOf(KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_X)),
-    START("Start", KeyEvent.KEYCODE_BUTTON_START, listOf(KeyEvent.KEYCODE_BUTTON_START)),
-    SELECT("Select", KeyEvent.KEYCODE_BUTTON_SELECT, listOf(KeyEvent.KEYCODE_BUTTON_SELECT))
+enum class PadAction(val label: String, val retroKey: Int) {
+    UP("Haut", KeyEvent.KEYCODE_DPAD_UP),
+    DOWN("Bas", KeyEvent.KEYCODE_DPAD_DOWN),
+    LEFT("Gauche", KeyEvent.KEYCODE_DPAD_LEFT),
+    RIGHT("Droite", KeyEvent.KEYCODE_DPAD_RIGHT),
+    A("A", KeyEvent.KEYCODE_BUTTON_A),
+    B("B", KeyEvent.KEYCODE_BUTTON_B),
+    X("X", KeyEvent.KEYCODE_BUTTON_X),
+    Y("Y", KeyEvent.KEYCODE_BUTTON_Y),
+    L("L", KeyEvent.KEYCODE_BUTTON_L1),
+    R("R", KeyEvent.KEYCODE_BUTTON_R1),
+    START("Start", KeyEvent.KEYCODE_BUTTON_START),
+    SELECT("Select", KeyEvent.KEYCODE_BUTTON_SELECT)
+}
+
+fun actionsFor(set: ButtonSet): List<PadAction> = when (set) {
+    ButtonSet.TWO -> listOf(
+        PadAction.UP, PadAction.DOWN, PadAction.LEFT, PadAction.RIGHT,
+        PadAction.A, PadAction.B, PadAction.START, PadAction.SELECT
+    )
+    ButtonSet.TWO_SHOULDER -> listOf(
+        PadAction.UP, PadAction.DOWN, PadAction.LEFT, PadAction.RIGHT,
+        PadAction.A, PadAction.B, PadAction.L, PadAction.R, PadAction.START, PadAction.SELECT
+    )
+    ButtonSet.FOUR_SHOULDER -> listOf(
+        PadAction.UP, PadAction.DOWN, PadAction.LEFT, PadAction.RIGHT,
+        PadAction.A, PadAction.B, PadAction.X, PadAction.Y,
+        PadAction.L, PadAction.R, PadAction.START, PadAction.SELECT
+    )
+}
+
+fun defaultKeys(action: PadAction, set: ButtonSet): List<Int> {
+    val strict = set == ButtonSet.FOUR_SHOULDER
+    return when (action) {
+        PadAction.UP -> listOf(KeyEvent.KEYCODE_DPAD_UP)
+        PadAction.DOWN -> listOf(KeyEvent.KEYCODE_DPAD_DOWN)
+        PadAction.LEFT -> listOf(KeyEvent.KEYCODE_DPAD_LEFT)
+        PadAction.RIGHT -> listOf(KeyEvent.KEYCODE_DPAD_RIGHT)
+        PadAction.A ->
+            if (strict) listOf(KeyEvent.KEYCODE_BUTTON_B)
+            else listOf(KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Y)
+        PadAction.B ->
+            if (strict) listOf(KeyEvent.KEYCODE_BUTTON_A)
+            else listOf(KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_X)
+        PadAction.X -> listOf(KeyEvent.KEYCODE_BUTTON_Y)
+        PadAction.Y -> listOf(KeyEvent.KEYCODE_BUTTON_X)
+        PadAction.L -> listOf(KeyEvent.KEYCODE_BUTTON_L1)
+        PadAction.R -> listOf(KeyEvent.KEYCODE_BUTTON_R1)
+        PadAction.START -> listOf(KeyEvent.KEYCODE_BUTTON_START)
+        PadAction.SELECT -> listOf(KeyEvent.KEYCODE_BUTTON_SELECT)
+    }
 }
 
 fun isGamepadSource(source: Int): Boolean =
@@ -47,22 +89,30 @@ fun padButtonName(keyCode: Int): String = when (keyCode) {
     else -> KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_")
 }
 
-class ControllerMapping(context: Context) {
+class ControllerMapping(context: Context, val buttonSet: ButtonSet) {
 
+    private val prefsName = when (buttonSet) {
+        ButtonSet.TWO -> "controller_mapping"
+        ButtonSet.TWO_SHOULDER -> "controller_mapping_gba"
+        ButtonSet.FOUR_SHOULDER -> "controller_mapping_snes"
+    }
     private val prefs: SharedPreferences =
-        context.getSharedPreferences("controller_mapping", Context.MODE_PRIVATE)
-    private val map = LinkedHashMap<NesAction, MutableSet<Int>>()
+        context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+    private val actions = actionsFor(buttonSet)
+    private val map = LinkedHashMap<PadAction, MutableSet<Int>>()
 
     init {
-        for (action in NesAction.values()) {
+        for (action in actions) {
             val stored = prefs.getString(action.name, null)
             map[action] = if (stored == null) {
-                action.defaults.toMutableSet()
+                defaultKeys(action, buttonSet).toMutableSet()
             } else {
                 stored.split(",").mapNotNull { it.toIntOrNull() }.toMutableSet()
             }
         }
     }
+
+    fun actionList(): List<PadAction> = actions
 
     private fun save() {
         val editor = prefs.edit()
@@ -70,32 +120,32 @@ class ControllerMapping(context: Context) {
         editor.apply()
     }
 
-    fun keysFor(action: NesAction): Set<Int> = map[action] ?: emptySet()
+    fun keysFor(action: PadAction): Set<Int> = map[action] ?: emptySet()
 
-    fun describe(action: NesAction): String {
+    fun describe(action: PadAction): String {
         val keys = keysFor(action)
         return if (keys.isEmpty()) "Non assign\u00e9" else keys.joinToString(" + ") { padButtonName(it) }
     }
 
-    fun lookup(keyCode: Int): NesAction? =
+    fun lookup(keyCode: Int): PadAction? =
         map.entries.firstOrNull { keyCode in it.value }?.key
 
-    fun assign(action: NesAction, keyCode: Int) {
+    fun assign(action: PadAction, keyCode: Int) {
         for (keys in map.values) keys.remove(keyCode)
         map[action] = mutableSetOf(keyCode)
         save()
     }
 
     fun swapAB() {
-        val a = map[NesAction.A] ?: mutableSetOf()
-        val b = map[NesAction.B] ?: mutableSetOf()
-        map[NesAction.A] = b
-        map[NesAction.B] = a
+        val a = map[PadAction.A] ?: mutableSetOf()
+        val b = map[PadAction.B] ?: mutableSetOf()
+        map[PadAction.A] = b
+        map[PadAction.B] = a
         save()
     }
 
     fun reset() {
-        for (action in NesAction.values()) map[action] = action.defaults.toMutableSet()
+        for (action in actions) map[action] = defaultKeys(action, buttonSet).toMutableSet()
         save()
     }
 }
