@@ -13,12 +13,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 9.3.1
-      - name: Telecharger le core NES (FCEUmm)
+      - name: Telecharger les moteurs (NES et Game Boy)
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a core
-          curl -fL -o fceumm.zip https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/fceumm_libretro_android.so.zip
-          unzip -o fceumm.zip -d core
-          mv core/fceumm_libretro_android.so app/src/main/jniLibs/arm64-v8a/libfceumm_libretro_android.so
+          for name in fceumm gambatte; do
+            curl -fL -o $name.zip https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/${name}_libretro_android.so.zip
+            unzip -o $name.zip -d core
+            mv core/${name}_libretro_android.so app/src/main/jniLibs/arm64-v8a/lib${name}_libretro_android.so
+          done
       - run: gradle assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
