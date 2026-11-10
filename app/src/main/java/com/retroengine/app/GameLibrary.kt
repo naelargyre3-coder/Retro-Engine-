@@ -104,7 +104,7 @@ class GameLibrary(private val context: Context) {
             }
         }
 
-        val header = ByteArray(0x150)
+        val header = ByteArray(0x10200)
         var read = 0
         tmp.inputStream().use { s ->
             while (read < header.size) {
