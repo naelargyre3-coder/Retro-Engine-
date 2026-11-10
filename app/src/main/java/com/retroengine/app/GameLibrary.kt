@@ -21,9 +21,17 @@ class GameLibrary(private val context: Context) {
     private val root = File(context.filesDir, "games").apply { mkdirs() }
     private val indexFile = File(root, "games.json")
 
-    fun romFile(id: String): File = File(File(root, id), "rom.nes")
+    fun romFile(id: String): File {
+        val dir = File(root, id)
+        for (ext in GameConsole.values().map { it.romExt }.distinct()) {
+            val f = File(dir, "rom.$ext")
+            if (f.exists()) return f
+        }
+        return File(dir, "rom.nes")
+    }
+
     fun iconFile(id: String): File = File(File(root, id), "icon.png")
-    
+
     fun hasSave(id: String): Boolean =
         File(File(context.filesDir, "saves"), "$id.sram").exists()
 
@@ -62,7 +70,7 @@ class GameLibrary(private val context: Context) {
     }
 
     fun displayName(uri: Uri): String {
-        var name = "Jeu NES"
+        var name = "Jeu"
         try {
             context.contentResolver
                 .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
@@ -78,7 +86,7 @@ class GameLibrary(private val context: Context) {
         return name.substringBeforeLast('.')
     }
 
-    // Copie la ROM dans la bibliotheque apres verification de son format.
+    // Copie la ROM dans la bibliotheque apres detection de la console.
     fun import(uri: Uri): GameEntry {
         val tmp = File(root, "import.tmp")
         val digest = MessageDigest.getInstance("SHA-1")
@@ -96,16 +104,22 @@ class GameLibrary(private val context: Context) {
             }
         }
 
-        val header = ByteArray(4)
-        val read = tmp.inputStream().use { it.read(header) }
-        val valid = read == 4 &&
-            header[0] == 'N'.code.toByte() &&
-            header[1] == 'E'.code.toByte() &&
-            header[2] == 'S'.code.toByte() &&
-            header[3] == 0x1A.toByte()
-        if (!valid) {
+        val header = ByteArray(0x150)
+        var read = 0
+        tmp.inputStream().use { s ->
+            while (read < header.size) {
+                val r = s.read(header, read, header.size - read)
+                if (r < 0) break
+                read += r
+            }
+        }
+        val console = GameConsole.detect(header.copyOf(read))
+        if (console == null) {
             tmp.delete()
-            throw IOException("Ce fichier n'est pas une ROM NES valide (format .nes attendu).")
+            throw IOException(
+                "ROM non reconnue. Formats pris en charge : NES (.nes), " +
+                    "Game Boy (.gb) et Game Boy Color (.gbc)."
+            )
         }
 
         val id = digest.digest().joinToString("") { "%02x".format(it) }
@@ -114,12 +128,12 @@ class GameLibrary(private val context: Context) {
             return it
         }
         File(root, id).mkdirs()
-        val target = romFile(id)
+        val target = File(File(root, id), "rom.${console.romExt}")
         if (!tmp.renameTo(target)) {
             tmp.copyTo(target, overwrite = true)
             tmp.delete()
         }
-        val entry = GameEntry(id, displayName(uri), "NES", System.currentTimeMillis())
+        val entry = GameEntry(id, displayName(uri), console.label, System.currentTimeMillis())
         write(all() + entry)
         return entry
     }
