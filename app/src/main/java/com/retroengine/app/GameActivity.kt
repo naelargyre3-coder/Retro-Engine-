@@ -208,7 +208,7 @@ class GameActivity : ComponentActivity() {
         retroView = view
         lifecycle.addObserver(view)
 
-        val overlay = TouchOverlay(this) { keyCode, pressed ->
+            val overlay = TouchOverlay(this, console.skin) { keyCode, pressed ->
             val action = if (pressed) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
             view.sendKeyEvent(action, keyCode, 0)
         }
