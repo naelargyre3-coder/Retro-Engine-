@@ -117,8 +117,8 @@ class GameLibrary(private val context: Context) {
         if (console == null) {
             tmp.delete()
             throw IOException(
-                "ROM non reconnue. Formats pris en charge : NES (.nes), " +
-                    "Game Boy (.gb) et Game Boy Color (.gbc)."
+            "ROM non reconnue. Formats pris en charge : NES, Game Boy, " +
+                "Game Boy Color, SNES et Game Boy Advance (ROM non zippées)."
             )
         }
 
