@@ -191,8 +191,13 @@ class GameActivity : ComponentActivity() {
         val saved = if (sram.exists()) sram.readBytes() else null
         lastSram = saved
 
+        val console = if (cfg != null) {
+            GameConsole.fromId(cfg.console)
+        } else {
+            GameConsole.fromLabel(GameLibrary(this).get(gameId)?.console)
+        } 
         val data = GLRetroViewData(this).apply {
-            coreFilePath = "libfceumm_libretro_android.so"
+            coreFilePath = console.coreLib
             gameFilePath = rom.absolutePath
             systemDirectory = filesDir.absolutePath
             savesDirectory = saves.absolutePath
