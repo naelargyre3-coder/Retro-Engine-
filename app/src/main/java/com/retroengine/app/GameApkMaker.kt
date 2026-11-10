@@ -109,6 +109,7 @@ object GameApkMaker {
         val config = JSONObject()
             .put("id", game.id)
             .put("name", game.name)
+            .put("console", GameConsole.fromLabel(game.console).name)
             .put("filter", GraphicsSettings.filter(context).name)
             .put("orientation", GraphicsSettings.orientation(context).name)
         val add = LinkedHashMap<String, ByteArray>()
