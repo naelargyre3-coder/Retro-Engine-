@@ -112,7 +112,7 @@ object GameApkMaker {
             .put("filter", GraphicsSettings.filter(context).name)
             .put("orientation", GraphicsSettings.orientation(context).name)
         val add = LinkedHashMap<String, ByteArray>()
-        add["assets/game/rom.nes"] = romBytes
+        add["assets/game/rom.bin"] = romBytes
         add["assets/game/game.json"] = config.toString().toByteArray(Charsets.UTF_8)
 
         log("Assemblage de l'APK")
@@ -127,7 +127,7 @@ object GameApkMaker {
 
         log("Contrôle du contenu")
         ZipFile(signed).use { zip ->
-            val rom = zip.getEntry("assets/game/rom.nes")
+            val rom = zip.getEntry("assets/game/rom.bin")
                 ?: throw IOException("La ROM est absente de l'APK généré.")
             if (rom.size != romBytes.size.toLong()) {
                 throw IOException("La ROM est incomplète dans l'APK généré.")
