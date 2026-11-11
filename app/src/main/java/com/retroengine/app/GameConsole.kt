@@ -58,7 +58,7 @@ enum class GameConsole(
         }
 
         // Detecte la console d'apres le contenu de la ROM, ou null si le format est inconnu
-        fun detect(header: ByteArray): GameConsole? {
+           fun detect(header: ByteArray, ext: String = ""): GameConsole? {
             if (header.size >= 4 &&
                 header[0] == 'N'.code.toByte() &&
                 header[1] == 'E'.code.toByte() &&
@@ -67,8 +67,8 @@ enum class GameConsole(
             ) return NES
 
             if (header.size >= 0xB3 &&
-                u(header, 0) == 0x24 && u(header, 1) == 0xFF &&
-                u(header, 2) == 0xAE && u(header, 3) == 0x51 &&
+                u(header, 4) == 0x24 && u(header, 5) == 0xFF &&
+                u(header, 6) == 0xAE && u(header, 7) == 0x51 &&
                 u(header, 0xB2) == 0x96
             ) return GBA
 
@@ -84,6 +84,8 @@ enum class GameConsole(
             }
 
             if (looksLikeSnes(header)) return SNES
+            if (ext == "sfc" || ext == "smc" || ext == "swc" || ext == "fig") return SNES
+            if (ext == "gba") return GBA
             return null
         }
     }
