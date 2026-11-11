@@ -6,10 +6,12 @@ class ConsoleSkin(
     val a: ButtonColors,
     val b: ButtonColors,
     val x: ButtonColors = a,
-    val y: ButtonColors = b
+    val y: ButtonColors = b,
+    val c: ButtonColors = a,
+    val z: ButtonColors = x
 )
 
-enum class ButtonSet { TWO, TWO_SHOULDER, FOUR_SHOULDER }
+enum class ButtonSet { TWO, TWO_SHOULDER, FOUR_SHOULDER, SIX }
 
 private val RED = ButtonColors(0xFFFF7A7A.toInt(), 0xFFD32F2F.toInt(), 0xFF7F1414.toInt())
 private val BLUE = ButtonColors(0xFF7AA8FF.toInt(), 0xFF1E5BD6.toInt(), 0xFF0F2F7A.toInt())
@@ -18,6 +20,8 @@ private val YELLOW = ButtonColors(0xFFFFE680.toInt(), 0xFFE0B010.toInt(), 0xFF8A
 private val GREEN = ButtonColors(0xFF8CE08C.toInt(), 0xFF2E9E3E.toInt(), 0xFF145A20.toInt())
 private val PURPLE = ButtonColors(0xFFC8A8FF.toInt(), 0xFF7A4FE0.toInt(), 0xFF35177F.toInt())
 private val INDIGO = ButtonColors(0xFF9A9AFF.toInt(), 0xFF4A3FC0.toInt(), 0xFF1E1670.toInt())
+private val NAVY = ButtonColors(0xFF6A7AA8.toInt(), 0xFF2A3560.toInt(), 0xFF10142E.toInt())
+private val SLATE = ButtonColors(0xFF7A7A86.toInt(), 0xFF38383F.toInt(), 0xFF141419.toInt())
 
 enum class GameConsole(
     val label: String,
@@ -30,7 +34,8 @@ enum class GameConsole(
     GB("Game Boy", "libgambatte_libretro_android.so", "gb", ButtonSet.TWO, ConsoleSkin(CHARCOAL, CHARCOAL)),
     GBC("Game Boy Color", "libgambatte_libretro_android.so", "gbc", ButtonSet.TWO, ConsoleSkin(RED, BLUE)),
     SNES("SNES", "libsnes9x_libretro_android.so", "sfc", ButtonSet.FOUR_SHOULDER, ConsoleSkin(RED, YELLOW, BLUE, GREEN)),
-    GBA("Game Boy Advance", "libmgba_libretro_android.so", "gba", ButtonSet.TWO_SHOULDER, ConsoleSkin(PURPLE, INDIGO));
+    GBA("Game Boy Advance", "libmgba_libretro_android.so", "gba", ButtonSet.TWO_SHOULDER, ConsoleSkin(PURPLE, INDIGO)),
+    MD("Mega Drive", "libgenesis_plus_gx_libretro_android.so", "md", ButtonSet.SIX, ConsoleSkin(NAVY, NAVY, SLATE, SLATE, NAVY, SLATE));
 
     companion object {
         private val GB_LOGO = intArrayOf(0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B)
@@ -58,7 +63,7 @@ enum class GameConsole(
         }
 
         // Detecte la console d'apres le contenu de la ROM, ou null si le format est inconnu
-           fun detect(header: ByteArray, ext: String = ""): GameConsole? {
+        fun detect(header: ByteArray, ext: String = ""): GameConsole? {
             if (header.size >= 4 &&
                 header[0] == 'N'.code.toByte() &&
                 header[1] == 'E'.code.toByte() &&
@@ -83,9 +88,19 @@ enum class GameConsole(
                 }
             }
 
+            if (header.size >= 0x108 &&
+                u(header, 0x100) == 'S'.code && u(header, 0x101) == 'E'.code &&
+                u(header, 0x102) == 'G'.code && u(header, 0x103) == 'A'.code
+            ) {
+                val is32x = u(header, 0x105) == '3'.code && u(header, 0x106) == '2'.code &&
+                    u(header, 0x107) == 'X'.code
+                if (!is32x) return MD
+            }
+
             if (looksLikeSnes(header)) return SNES
             if (ext == "sfc" || ext == "smc" || ext == "swc" || ext == "fig") return SNES
             if (ext == "gba") return GBA
+            if (ext == "md" || ext == "gen" || ext == "smd") return MD
             return null
         }
     }
