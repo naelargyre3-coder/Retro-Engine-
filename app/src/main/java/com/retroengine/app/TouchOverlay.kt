@@ -58,8 +58,8 @@ class TouchOverlay(
     private val six = console.buttonSet == ButtonSet.SIX
     private val hasShoulders =
         console.buttonSet == ButtonSet.TWO_SHOULDER || console.buttonSet == ButtonSet.FOUR_SHOULDER
-
-        private val faces: List<RoundButton> = if (six) {
+   
+    private val faces: List<RoundButton> = if (six) {
         listOf(
             RoundButton(KeyEvent.KEYCODE_BUTTON_L1, "X", skin.x),
             RoundButton(KeyEvent.KEYCODE_BUTTON_X, "Y", skin.y),
@@ -69,6 +69,7 @@ class TouchOverlay(
             RoundButton(KeyEvent.KEYCODE_BUTTON_A, "C", skin.c)
         )
     } else if (four) {
+        listOf(
             RoundButton(KeyEvent.KEYCODE_BUTTON_X, "X", skin.x),
             RoundButton(KeyEvent.KEYCODE_BUTTON_Y, "Y", skin.y),
             RoundButton(KeyEvent.KEYCODE_BUTTON_A, "A", skin.a),
