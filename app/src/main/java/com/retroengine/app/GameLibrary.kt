@@ -68,7 +68,20 @@ class GameLibrary(private val context: Context) {
         }
         indexFile.writeText(arr.toString())
     }
-
+    private fun rawName(uri: Uri): String {
+        var name = ""
+        try {
+            context.contentResolver
+                .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { c ->
+                    if (c.moveToFirst()) name = c.getString(0) ?: ""
+                }
+        } catch (e: Exception) {
+            // Nom inconnu
+        }
+        return name
+    }
+    
     fun displayName(uri: Uri): String {
         var name = "Jeu"
         try {
@@ -113,7 +126,12 @@ class GameLibrary(private val context: Context) {
                 read += r
             }
         }
-        val console = GameConsole.detect(header.copyOf(read))
+        if (read >= 4 && header[0] == 0x50.toByte() && header[1] == 0x4B.toByte()) {
+            tmp.delete()
+            throw IOException("Ce fichier est un zip : décompresse-le avant de l'ajouter.")
+        }
+        val ext = rawName(uri).substringAfterLast('.', "").lowercase()
+        val console = GameConsole.detect(header.copyOf(read), ext)
         if (console == null) {
             tmp.delete()
             throw IOException(
