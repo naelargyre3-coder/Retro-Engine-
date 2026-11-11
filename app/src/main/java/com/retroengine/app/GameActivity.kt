@@ -194,8 +194,8 @@ class GameActivity : ComponentActivity() {
         } else {
             GameConsole.fromLabel(GameLibrary(this).get(gameId)?.console)
         } 
-        val data = GLRetroViewData(this).apply {
-            mapping = ControllerMapping(this, console.buttonSet)  
+        val data = GLRetroViewData(this).apply {        
+            mapping = ControllerMapping(this@GameActivity, console.buttonSet)  
             coreFilePath = console.coreLib
             gameFilePath = rom.absolutePath
             systemDirectory = filesDir.absolutePath
