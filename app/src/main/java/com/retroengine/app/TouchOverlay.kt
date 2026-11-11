@@ -55,10 +55,20 @@ class TouchOverlay(
 
     private val skin = console.skin
     private val four = console.buttonSet == ButtonSet.FOUR_SHOULDER
-    private val hasShoulders = console.buttonSet != ButtonSet.TWO
+    private val six = console.buttonSet == ButtonSet.SIX
+    private val hasShoulders =
+        console.buttonSet == ButtonSet.TWO_SHOULDER || console.buttonSet == ButtonSet.FOUR_SHOULDER
 
-    private val faces: List<RoundButton> = if (four) {
+        private val faces: List<RoundButton> = if (six) {
         listOf(
+            RoundButton(KeyEvent.KEYCODE_BUTTON_L1, "X", skin.x),
+            RoundButton(KeyEvent.KEYCODE_BUTTON_X, "Y", skin.y),
+            RoundButton(KeyEvent.KEYCODE_BUTTON_R1, "Z", skin.z),
+            RoundButton(KeyEvent.KEYCODE_BUTTON_Y, "A", skin.a),
+            RoundButton(KeyEvent.KEYCODE_BUTTON_B, "B", skin.b),
+            RoundButton(KeyEvent.KEYCODE_BUTTON_A, "C", skin.c)
+        )
+    } else if (four) {
             RoundButton(KeyEvent.KEYCODE_BUTTON_X, "X", skin.x),
             RoundButton(KeyEvent.KEYCODE_BUTTON_Y, "Y", skin.y),
             RoundButton(KeyEvent.KEYCODE_BUTTON_A, "A", skin.a),
@@ -70,7 +80,10 @@ class TouchOverlay(
             RoundButton(KeyEvent.KEYCODE_BUTTON_B, "B", skin.b)
         )
     }
-    private val select = PillButton(KeyEvent.KEYCODE_BUTTON_SELECT, "SELECT")
+    private val select = PillButton(
+        KeyEvent.KEYCODE_BUTTON_SELECT,
+        if (console == GameConsole.MD) "MODE" else "SELECT"
+    )
     private val start = PillButton(KeyEvent.KEYCODE_BUTTON_START, "START")
     private val shoulderL = PillButton(KeyEvent.KEYCODE_BUTTON_L1, "L")
     private val shoulderR = PillButton(KeyEvent.KEYCODE_BUTTON_R1, "R")
@@ -204,7 +217,18 @@ class TouchOverlay(
             CENTER_IN, CENTER_OUT, Shader.TileMode.CLAMP
         )
 
-        if (four) {
+        if (six) {
+            val r = 0.07f * u
+            val gapX = 2.25f * r
+            val rowGap = 2.2f * r
+            val x0 = right - side - r - 2 * gapX
+            val yBottom = bottom - margin - r
+            for ((i, b) in faces.withIndex()) {
+                b.r = r
+                b.cx = x0 + (i % 3) * gapX
+                b.cy = yBottom - (1 - i / 3) * rowGap
+            }
+        } else if (four) {
             val r = 0.078f * u
             val off = 1.75f * r
             val ccx = right - side - (off + r)
@@ -285,7 +309,7 @@ class TouchOverlay(
         }
         var best: RoundButton? = null
         var bestDist = Float.MAX_VALUE
-        val factor = if (four) 1.25f else 1.35f
+        val factor = if (four || six) 1.2f else 1.35f
         for (b in faces) {
             val d = hypot(x - b.cx, y - b.cy)
             if (d <= b.r * factor && d < bestDist) {
