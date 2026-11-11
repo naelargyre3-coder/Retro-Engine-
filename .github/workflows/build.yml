@@ -16,7 +16,7 @@ jobs:
       - name: Telecharger les moteurs (NES, Game Boy, SNES, GBA)
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a core
-          for name in fceumm gambatte snes9x mgba; do
+            for name in fceumm gambatte snes9x mgba genesis_plus_gx; do
             curl -fL -o $name.zip https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/${name}_libretro_android.so.zip
             unzip -o $name.zip -d core
             mv core/${name}_libretro_android.so app/src/main/jniLibs/arm64-v8a/lib${name}_libretro_android.so
