@@ -17,7 +17,14 @@ enum class PadAction(val label: String, val retroKey: Int) {
     L("L", KeyEvent.KEYCODE_BUTTON_L1),
     R("R", KeyEvent.KEYCODE_BUTTON_R1),
     START("Start", KeyEvent.KEYCODE_BUTTON_START),
-    SELECT("Select", KeyEvent.KEYCODE_BUTTON_SELECT)
+    SELECT("Select", KeyEvent.KEYCODE_BUTTON_SELECT),
+    // Mega Drive : le moteur attend A=Y, B=B, C=A, X=L, Y=X, Z=R sur la manette libretro
+    MD_A("A", KeyEvent.KEYCODE_BUTTON_Y),
+    MD_B("B", KeyEvent.KEYCODE_BUTTON_B),
+    MD_C("C", KeyEvent.KEYCODE_BUTTON_A),
+    MD_X("X", KeyEvent.KEYCODE_BUTTON_L1),
+    MD_Y("Y", KeyEvent.KEYCODE_BUTTON_X),
+    MD_Z("Z", KeyEvent.KEYCODE_BUTTON_R1)
 }
 
 fun actionsFor(set: ButtonSet): List<PadAction> = when (set) {
@@ -33,6 +40,12 @@ fun actionsFor(set: ButtonSet): List<PadAction> = when (set) {
         PadAction.UP, PadAction.DOWN, PadAction.LEFT, PadAction.RIGHT,
         PadAction.A, PadAction.B, PadAction.X, PadAction.Y,
         PadAction.L, PadAction.R, PadAction.START, PadAction.SELECT
+    )
+    ButtonSet.SIX -> listOf(
+        PadAction.UP, PadAction.DOWN, PadAction.LEFT, PadAction.RIGHT,
+        PadAction.MD_A, PadAction.MD_B, PadAction.MD_C,
+        PadAction.MD_X, PadAction.MD_Y, PadAction.MD_Z,
+        PadAction.START, PadAction.SELECT
     )
 }
 
@@ -55,6 +68,12 @@ fun defaultKeys(action: PadAction, set: ButtonSet): List<Int> {
         PadAction.R -> listOf(KeyEvent.KEYCODE_BUTTON_R1)
         PadAction.START -> listOf(KeyEvent.KEYCODE_BUTTON_START)
         PadAction.SELECT -> listOf(KeyEvent.KEYCODE_BUTTON_SELECT)
+        PadAction.MD_A -> listOf(KeyEvent.KEYCODE_BUTTON_X)
+        PadAction.MD_B -> listOf(KeyEvent.KEYCODE_BUTTON_A)
+        PadAction.MD_C -> listOf(KeyEvent.KEYCODE_BUTTON_B)
+        PadAction.MD_X -> listOf(KeyEvent.KEYCODE_BUTTON_L1)
+        PadAction.MD_Y -> listOf(KeyEvent.KEYCODE_BUTTON_Y)
+        PadAction.MD_Z -> listOf(KeyEvent.KEYCODE_BUTTON_R1)
     }
 }
 
@@ -95,6 +114,7 @@ class ControllerMapping(context: Context, val buttonSet: ButtonSet) {
         ButtonSet.TWO -> "controller_mapping"
         ButtonSet.TWO_SHOULDER -> "controller_mapping_gba"
         ButtonSet.FOUR_SHOULDER -> "controller_mapping_snes"
+        ButtonSet.SIX -> "controller_mapping_md"
     }
     private val prefs: SharedPreferences =
         context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
@@ -136,11 +156,14 @@ class ControllerMapping(context: Context, val buttonSet: ButtonSet) {
         save()
     }
 
+    // Inverse les deux boutons principaux (A et B)
     fun swapAB() {
-        val a = map[PadAction.A] ?: mutableSetOf()
-        val b = map[PadAction.B] ?: mutableSetOf()
-        map[PadAction.A] = b
-        map[PadAction.B] = a
+        val first = if (buttonSet == ButtonSet.SIX) PadAction.MD_A else PadAction.A
+        val second = if (buttonSet == ButtonSet.SIX) PadAction.MD_B else PadAction.B
+        val a = map[first] ?: mutableSetOf()
+        val b = map[second] ?: mutableSetOf()
+        map[first] = b
+        map[second] = a
         save()
     }
 
