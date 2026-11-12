@@ -20,17 +20,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import kotlin.math.abs
 
 class GameActivity : ComponentActivity() {
 
     private var retroView: GLRetroView? = null
-    private var touchOverlay: TouchOverlay? = null
+    private var touchOverlay: View? = null
     private var overlayHidden = false
     private var sramFile: File? = null
     private var lastSram: ByteArray? = null
     private var inputManager: InputManager? = null
     private var mapping: ControllerMapping? = null
     private var embedded: EmbeddedConfig? = null
+    private var console: GameConsole = GameConsole.NES
 
     private val dirState = BooleanArray(4)
     private val dirKeys = intArrayOf(
@@ -107,18 +109,36 @@ class GameActivity : ComponentActivity() {
         retroView?.sendKeyEvent(action, dirKeys[index], 0)
     }
 
+    private fun pickAxis(e: MotionEvent, first: Int, second: Int): Float {
+        val v = e.getAxisValue(first)
+        return if (abs(v) > 0.01f) v else e.getAxisValue(second)
+    }
+
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (retroView != null && isGamepadSource(event.source) &&
+        val view = retroView
+        if (view != null && isGamepadSource(event.source) &&
             event.actionMasked == MotionEvent.ACTION_MOVE
         ) {
             val x = event.getAxisValue(MotionEvent.AXIS_X)
             val y = event.getAxisValue(MotionEvent.AXIS_Y)
             val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
             val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
-            setDirection(0, x < -0.5f || hatX < -0.5f)
-            setDirection(1, x > 0.5f || hatX > 0.5f)
-            setDirection(2, y < -0.5f || hatY < -0.5f)
-            setDirection(3, y > 0.5f || hatY > 0.5f)
+            if (console == GameConsole.N64) {
+                // Stick gauche analogique, stick droit pour les boutons C, croix par le hat
+                view.sendMotionEvent(GLRetroView.MOTION_SOURCE_ANALOG_LEFT, x, y, 0)
+                val rx = pickAxis(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX)
+                val ry = pickAxis(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY)
+                view.sendMotionEvent(GLRetroView.MOTION_SOURCE_ANALOG_RIGHT, rx, ry, 0)
+                setDirection(0, hatX < -0.5f)
+                setDirection(1, hatX > 0.5f)
+                setDirection(2, hatY < -0.5f)
+                setDirection(3, hatY > 0.5f)
+            } else {
+                setDirection(0, x < -0.5f || hatX < -0.5f)
+                setDirection(1, x > 0.5f || hatX > 0.5f)
+                setDirection(2, y < -0.5f || hatY < -0.5f)
+                setDirection(3, y > 0.5f || hatY > 0.5f)
+            }
             return true
         }
         return super.dispatchGenericMotionEvent(event)
@@ -130,7 +150,7 @@ class GameActivity : ComponentActivity() {
         if (hide == overlayHidden) return
         overlayHidden = hide
         if (hide) {
-            overlay.releaseAll()
+            (overlay as? PadOverlay)?.releaseAll()
             overlay.animate()
                 .alpha(0f).scaleX(0.92f).scaleY(0.92f)
                 .setDuration(250)
@@ -189,13 +209,14 @@ class GameActivity : ComponentActivity() {
         val saved = if (sram.exists()) sram.readBytes() else null
         lastSram = saved
 
-        val console = if (cfg != null) {
+        console = if (cfg != null) {
             GameConsole.fromId(cfg.console)
         } else {
             GameConsole.fromLabel(GameLibrary(this).get(gameId)?.console)
-        } 
-        val data = GLRetroViewData(this).apply {        
-            mapping = ControllerMapping(this@GameActivity, console.buttonSet)  
+        }
+        mapping = ControllerMapping(this, console.buttonSet)
+
+        val data = GLRetroViewData(this).apply {
             coreFilePath = console.coreLib
             gameFilePath = rom.absolutePath
             systemDirectory = filesDir.absolutePath
@@ -207,9 +228,21 @@ class GameActivity : ComponentActivity() {
         retroView = view
         lifecycle.addObserver(view)
 
-            val overlay = TouchOverlay(this, console) { keyCode, pressed ->
+        val keyCallback: (Int, Boolean) -> Unit = { keyCode, pressed ->
             val action = if (pressed) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP
             view.sendKeyEvent(action, keyCode, 0)
+        }
+        val overlay: View = if (console == GameConsole.N64) {
+            N64TouchOverlay(this, console.skin, keyCallback) { right, x, y ->
+                val source = if (right) {
+                    GLRetroView.MOTION_SOURCE_ANALOG_RIGHT
+                } else {
+                    GLRetroView.MOTION_SOURCE_ANALOG_LEFT
+                }
+                view.sendMotionEvent(source, x, y, 0)
+            }
+        } else {
+            TouchOverlay(this, console, keyCallback)
         }
         touchOverlay = overlay
         overlayHidden = false
