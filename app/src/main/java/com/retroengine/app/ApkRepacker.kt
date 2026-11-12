@@ -38,7 +38,8 @@ object ApkRepacker {
         input: File,
         output: File,
         replace: Map<String, ByteArray>,
-        add: Map<String, ByteArray>
+        add: Map<String, ByteArray>,
+        skip: (String) -> Boolean = { false }
     ) {
         val counter = Counting(BufferedOutputStream(FileOutputStream(output), 64 * 1024))
         ZipOutputStream(counter).use { zos ->
@@ -47,7 +48,7 @@ object ApkRepacker {
                 while (entries.hasMoreElements()) {
                     val e = entries.nextElement()
                     val name = e.name
-                    if (e.isDirectory || isSignatureEntry(name)) continue
+                    if (e.isDirectory || isSignatureEntry(name) || skip(name)) continue
                     val data = replace[name] ?: zip.getInputStream(e).use { it.readBytes() }
                     writeEntry(zos, counter, name, data, e.method == ZipEntry.STORED)
                 }
