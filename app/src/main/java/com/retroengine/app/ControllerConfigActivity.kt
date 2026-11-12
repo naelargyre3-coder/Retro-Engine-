@@ -62,6 +62,7 @@ class ControllerConfigActivity : ComponentActivity() {
         selector.addView(selectorButton("GBA", ButtonSet.TWO_SHOULDER), selectorParams())
         selector.addView(selectorButton("SNES", ButtonSet.FOUR_SHOULDER), selectorParams())
         selector.addView(selectorButton("MD", ButtonSet.SIX), selectorParams())
+        selector.addView(selectorButton("N64", ButtonSet.N64), selectorParams())
         column.addView(
             selector,
             LinearLayout.LayoutParams(
