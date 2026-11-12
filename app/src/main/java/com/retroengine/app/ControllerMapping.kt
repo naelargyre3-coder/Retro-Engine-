@@ -24,7 +24,13 @@ enum class PadAction(val label: String, val retroKey: Int) {
     MD_C("C", KeyEvent.KEYCODE_BUTTON_A),
     MD_X("X", KeyEvent.KEYCODE_BUTTON_L1),
     MD_Y("Y", KeyEvent.KEYCODE_BUTTON_X),
-    MD_Z("Z", KeyEvent.KEYCODE_BUTTON_R1)
+    MD_Z("Z", KeyEvent.KEYCODE_BUTTON_R1),
+    // Nintendo 64 : A = B libretro, B = Y libretro, Z = L2, L = L1, R = R1
+    N64_A("A", KeyEvent.KEYCODE_BUTTON_B),
+    N64_B("B", KeyEvent.KEYCODE_BUTTON_Y),
+    N64_Z("Z", KeyEvent.KEYCODE_BUTTON_L2),
+    N64_L("L", KeyEvent.KEYCODE_BUTTON_L1),
+    N64_R("R", KeyEvent.KEYCODE_BUTTON_R1)
 }
 
 fun actionsFor(set: ButtonSet): List<PadAction> = when (set) {
@@ -46,6 +52,11 @@ fun actionsFor(set: ButtonSet): List<PadAction> = when (set) {
         PadAction.MD_A, PadAction.MD_B, PadAction.MD_C,
         PadAction.MD_X, PadAction.MD_Y, PadAction.MD_Z,
         PadAction.START, PadAction.SELECT
+    )
+    ButtonSet.N64 -> listOf(
+        PadAction.UP, PadAction.DOWN, PadAction.LEFT, PadAction.RIGHT,
+        PadAction.N64_A, PadAction.N64_B, PadAction.N64_Z,
+        PadAction.N64_L, PadAction.N64_R, PadAction.START
     )
 }
 
@@ -74,6 +85,11 @@ fun defaultKeys(action: PadAction, set: ButtonSet): List<Int> {
         PadAction.MD_X -> listOf(KeyEvent.KEYCODE_BUTTON_L1)
         PadAction.MD_Y -> listOf(KeyEvent.KEYCODE_BUTTON_Y)
         PadAction.MD_Z -> listOf(KeyEvent.KEYCODE_BUTTON_R1)
+        PadAction.N64_A -> listOf(KeyEvent.KEYCODE_BUTTON_A)
+        PadAction.N64_B -> listOf(KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_BUTTON_B)
+        PadAction.N64_Z -> listOf(KeyEvent.KEYCODE_BUTTON_L2)
+        PadAction.N64_L -> listOf(KeyEvent.KEYCODE_BUTTON_L1)
+        PadAction.N64_R -> listOf(KeyEvent.KEYCODE_BUTTON_R1)
     }
 }
 
@@ -115,6 +131,7 @@ class ControllerMapping(context: Context, val buttonSet: ButtonSet) {
         ButtonSet.TWO_SHOULDER -> "controller_mapping_gba"
         ButtonSet.FOUR_SHOULDER -> "controller_mapping_snes"
         ButtonSet.SIX -> "controller_mapping_md"
+        ButtonSet.N64 -> "controller_mapping_n64"
     }
     private val prefs: SharedPreferences =
         context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
@@ -156,10 +173,18 @@ class ControllerMapping(context: Context, val buttonSet: ButtonSet) {
         save()
     }
 
-    // Inverse les deux boutons principaux (A et B)
+    // Inverse les deux boutons principaux
     fun swapAB() {
-        val first = if (buttonSet == ButtonSet.SIX) PadAction.MD_A else PadAction.A
-        val second = if (buttonSet == ButtonSet.SIX) PadAction.MD_B else PadAction.B
+        val first = when (buttonSet) {
+            ButtonSet.SIX -> PadAction.MD_A
+            ButtonSet.N64 -> PadAction.N64_A
+            else -> PadAction.A
+        }
+        val second = when (buttonSet) {
+            ButtonSet.SIX -> PadAction.MD_B
+            ButtonSet.N64 -> PadAction.N64_B
+            else -> PadAction.B
+        }
         val a = map[first] ?: mutableSetOf()
         val b = map[second] ?: mutableSetOf()
         map[first] = b
