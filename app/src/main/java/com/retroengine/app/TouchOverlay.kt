@@ -40,7 +40,7 @@ class TouchOverlay(
     context: Context,
     private val console: GameConsole,
     private val onKey: (keyCode: Int, pressed: Boolean) -> Unit
-) : View(context), PadOverlay {
+) : View(context), PadOverlay, EditableOverlay {
 
     private class RoundButton(val key: Int, val label: String, val colors: ButtonColors) {
         var cx = 0f
@@ -54,11 +54,11 @@ class TouchOverlay(
     }
 
     private val skin = console.skin
-    private val four = console.buttonSet == ButtonSet.FOUR_SHOULDER
     private val six = console.buttonSet == ButtonSet.SIX
+    private val four = console.buttonSet == ButtonSet.FOUR_SHOULDER
     private val hasShoulders =
         console.buttonSet == ButtonSet.TWO_SHOULDER || console.buttonSet == ButtonSet.FOUR_SHOULDER
-   
+
     private val faces: List<RoundButton> = if (six) {
         listOf(
             RoundButton(KeyEvent.KEYCODE_BUTTON_L1, "X", skin.x),
@@ -115,6 +115,13 @@ class TouchOverlay(
     private var insetB = 0f
     private var pressedKeys: Set<Int> = emptySet()
 
+    private var adjust: ControlAdjust? = null
+    private var adjustLandscape = false
+    private val editor = OverlayEditor(this) {
+        layoutControls()
+        invalidate()
+    }
+
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -158,6 +165,56 @@ class TouchOverlay(
         layoutControls()
     }
 
+    // ---------- Edition ----------
+
+    override fun setEditMode(on: Boolean) {
+        editor.active = on
+        if (on) releaseAll()
+        invalidate()
+    }
+
+    override fun scaleSelected(factor: Float) {
+        editor.scaleSelected(factor)
+    }
+
+    override fun resetAdjust() {
+        editor.reset()
+    }
+
+    override fun setSelectionListener(listener: (String?) -> Unit) {
+        editor.listener = listener
+    }
+
+    private fun adjustFor(landscape: Boolean): ControlAdjust {
+        val current = adjust
+        if (current != null && adjustLandscape == landscape) return current
+        val created = ControlAdjust(context, console.buttonSet, landscape)
+        adjust = created
+        adjustLandscape = landscape
+        editor.adjust = created
+        return created
+    }
+
+    private fun adjustRounds(list: List<RoundButton>, g: ControlAdjust.G, u: Float) {
+        val mx = list.map { it.cx }.average().toFloat()
+        val my = list.map { it.cy }.average().toFloat()
+        for (b in list) {
+            b.cx = mx + (b.cx - mx) * g.scale + g.dx * u
+            b.cy = my + (b.cy - my) * g.scale + g.dy * u
+            b.r *= g.scale
+        }
+    }
+
+    private fun adjustPill(p: PillButton, g: ControlAdjust.G, u: Float) {
+        val cx = p.rect.centerX() + g.dx * u
+        val cy = p.rect.centerY() + g.dy * u
+        val w = p.rect.width() * g.scale
+        val h = p.rect.height() * g.scale
+        p.rect.set(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+    }
+
+    // ---------- Disposition ----------
+
     private fun makeShader(b: RoundButton): Shader =
         RadialGradient(
             b.cx - b.r * 0.3f, b.cy - b.r * 0.3f, b.r * 1.3f,
@@ -192,31 +249,13 @@ class TouchOverlay(
         val u = min(w, h)
         val margin = if (landscape) 0.07f * u else 0.14f * u
         val side = 0.05f * u
+        editor.unit = u
+        val adj = adjustFor(landscape)
 
-        padR = (if (landscape) 0.21f else 0.19f) * u
-        padX = left + side + padR
-        padY = bottom - margin - padR
-
-        val th = padR * 0.62f
-        armRects[0].set(padX - th / 2, padY - padR, padX + th / 2, padY - th / 2)
-        armRects[1].set(padX - th / 2, padY + th / 2, padX + th / 2, padY + padR)
-        armRects[2].set(padX - padR, padY - th / 2, padX - th / 2, padY + th / 2)
-        armRects[3].set(padX + th / 2, padY - th / 2, padX + padR, padY + th / 2)
-
-        plusOuter = plusPath(padX, padY, padR, th, th * 0.3f)
-        plusInner = plusPath(padX, padY, padR * 0.93f, th * 0.78f, th * 0.24f)
-        outerShader = LinearGradient(
-            0f, padY - padR, 0f, padY + padR,
-            PAD_OUT_TOP, PAD_OUT_BOTTOM, Shader.TileMode.CLAMP
-        )
-        innerShader = LinearGradient(
-            0f, padY - padR, 0f, padY + padR,
-            PAD_IN_TOP, PAD_IN_BOTTOM, Shader.TileMode.CLAMP
-        )
-        centerShader = RadialGradient(
-            padX, padY, th * 0.3f,
-            CENTER_IN, CENTER_OUT, Shader.TileMode.CLAMP
-        )
+        // Positions par defaut
+        val padR0 = (if (landscape) 0.21f else 0.19f) * u
+        val padX0 = left + side + padR0
+        val padY0 = bottom - margin - padR0
 
         if (six) {
             val r = 0.07f * u
@@ -254,7 +293,6 @@ class TouchOverlay(
             b.cx = a.cx - 2.3f * r
             b.cy = bottom - margin - r
         }
-        for (b in faces) b.shader = makeShader(b)
 
         val pillW = 0.2f * u
         val pillH = 0.07f * u
@@ -265,24 +303,77 @@ class TouchOverlay(
         start.rect.set(cx + gap, pillY - pillH / 2, cx + gap + pillW, pillY + pillH / 2)
 
         if (hasShoulders) {
-            val shW = 0.24f * u
+            val shW = 0.26f * u
+            val shH = 0.11f * u
             val faceLeft = faces.minOf { it.cx - it.r }
             val faceRight = faces.maxOf { it.cx + it.r }
             val faceTop = faces.minOf { it.cy - it.r }
             val faceCx = (faceLeft + faceRight) / 2
             if (landscape) {
                 val y = 0.05f * u
-                shoulderL.rect.set(left + side, y, left + side + shW, y + pillH)
-                shoulderR.rect.set(right - side - shW, y, right - side, y + pillH)
+                shoulderL.rect.set(left + side, y, left + side + shW, y + shH)
+                shoulderR.rect.set(right - side - shW, y, right - side, y + shH)
             } else {
-                val top = min(padY - padR, faceTop) - 0.04f * u - pillH
-                shoulderL.rect.set(padX - shW / 2, top, padX + shW / 2, top + pillH)
-                shoulderR.rect.set(faceCx - shW / 2, top, faceCx + shW / 2, top + pillH)
+                val top = min(padY0 - padR0, faceTop) - 0.04f * u - shH
+                shoulderL.rect.set(padX0 - shW / 2, top, padX0 + shW / 2, top + shH)
+                shoulderR.rect.set(faceCx - shW / 2, top, faceCx + shW / 2, top + shH)
             }
+        }
+
+        // Reglages de l'utilisateur
+        val gp = adj.get("pad")
+        padR = padR0 * gp.scale
+        padX = padX0 + gp.dx * u
+        padY = padY0 + gp.dy * u
+        adjustRounds(faces, adj.get("face"), u)
+        adjustPill(select, adj.get("select"), u)
+        adjustPill(start, adj.get("start"), u)
+        if (hasShoulders) {
+            adjustPill(shoulderL, adj.get("l"), u)
+            adjustPill(shoulderR, adj.get("r"), u)
+        }
+
+        // Forme de la croix
+        val th = padR * 0.62f
+        armRects[0].set(padX - th / 2, padY - padR, padX + th / 2, padY - th / 2)
+        armRects[1].set(padX - th / 2, padY + th / 2, padX + th / 2, padY + padR)
+        armRects[2].set(padX - padR, padY - th / 2, padX - th / 2, padY + th / 2)
+        armRects[3].set(padX + th / 2, padY - th / 2, padX + padR, padY + th / 2)
+        plusOuter = plusPath(padX, padY, padR, th, th * 0.3f)
+        plusInner = plusPath(padX, padY, padR * 0.93f, th * 0.78f, th * 0.24f)
+        outerShader = LinearGradient(
+            0f, padY - padR, 0f, padY + padR,
+            PAD_OUT_TOP, PAD_OUT_BOTTOM, Shader.TileMode.CLAMP
+        )
+        innerShader = LinearGradient(
+            0f, padY - padR, 0f, padY + padR,
+            PAD_IN_TOP, PAD_IN_BOTTOM, Shader.TileMode.CLAMP
+        )
+        centerShader = RadialGradient(
+            padX, padY, th * 0.3f,
+            CENTER_IN, CENTER_OUT, Shader.TileMode.CLAMP
+        )
+        for (b in faces) b.shader = makeShader(b)
+
+        // Zones de selection pour l'edition
+        editor.bounds.clear()
+        editor.bounds["pad"] = RectF(padX - padR, padY - padR, padX + padR, padY + padR)
+        editor.bounds["face"] = RectF(
+            faces.minOf { it.cx - it.r }, faces.minOf { it.cy - it.r },
+            faces.maxOf { it.cx + it.r }, faces.maxOf { it.cy + it.r }
+        )
+        editor.bounds["select"] = RectF(select.rect)
+        editor.bounds["start"] = RectF(start.rect)
+        if (hasShoulders) {
+            editor.bounds["l"] = RectF(shoulderL.rect)
+            editor.bounds["r"] = RectF(shoulderR.rect)
         }
     }
 
+    // ---------- Touches ----------
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (editor.active) return editor.onTouch(event)
         val ending = event.actionMasked == MotionEvent.ACTION_UP ||
             event.actionMasked == MotionEvent.ACTION_CANCEL
         val skipIndex =
@@ -338,6 +429,8 @@ class TouchOverlay(
             invalidate()
         }
     }
+
+    // ---------- Dessin ----------
 
     private fun arrow(
         canvas: Canvas, cx: Float, cy: Float, size: Float,
@@ -427,5 +520,7 @@ class TouchOverlay(
             canvas.drawRoundRect(p.rect, radius, radius, stroke)
             canvas.drawText(p.label, p.rect.centerX(), p.rect.centerY() + text.textSize / 3, text)
         }
+
+        editor.draw(canvas)
     }
 }
