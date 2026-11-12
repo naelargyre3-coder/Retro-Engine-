@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.swordfish.libretrodroid.GLRetroView
 import com.swordfish.libretrodroid.GLRetroViewData
+import com.swordfish.libretrodroid.Variable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -223,6 +224,14 @@ class GameActivity : ComponentActivity() {
             savesDirectory = saves.absolutePath
             saveRAMState = saved
             shader = shaderConfig
+                   if (console == GameConsole.N64) {
+                variables = arrayOf(
+                    Variable("mupen64plus-EnableFBEmulation", "False"),
+                    Variable("mupen64plus-EnableCopyColorToRDRAM", "Off"),
+                    Variable("mupen64plus-EnableCopyDepthToRDRAM", "Off"),
+                    Variable("mupen64plus-EnableLODEmulation", "False")
+                )
+            }
         }
         val view = GLRetroView(this, data)
         retroView = view
