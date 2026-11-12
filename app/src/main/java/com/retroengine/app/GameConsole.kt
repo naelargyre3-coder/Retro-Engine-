@@ -11,7 +11,7 @@ class ConsoleSkin(
     val z: ButtonColors = x
 )
 
-enum class ButtonSet { TWO, TWO_SHOULDER, FOUR_SHOULDER, SIX }
+enum class ButtonSet { TWO, TWO_SHOULDER, FOUR_SHOULDER, SIX, N64 }
 
 private val RED = ButtonColors(0xFFFF7A7A.toInt(), 0xFFD32F2F.toInt(), 0xFF7F1414.toInt())
 private val BLUE = ButtonColors(0xFF7AA8FF.toInt(), 0xFF1E5BD6.toInt(), 0xFF0F2F7A.toInt())
@@ -35,7 +35,8 @@ enum class GameConsole(
     GBC("Game Boy Color", "libgambatte_libretro_android.so", "gbc", ButtonSet.TWO, ConsoleSkin(RED, BLUE)),
     SNES("SNES", "libsnes9x_libretro_android.so", "sfc", ButtonSet.FOUR_SHOULDER, ConsoleSkin(RED, YELLOW, BLUE, GREEN)),
     GBA("Game Boy Advance", "libmgba_libretro_android.so", "gba", ButtonSet.TWO_SHOULDER, ConsoleSkin(PURPLE, INDIGO)),
-    MD("Mega Drive", "libgenesis_plus_gx_libretro_android.so", "md", ButtonSet.SIX, ConsoleSkin(NAVY, NAVY, SLATE, SLATE, NAVY, SLATE));
+    MD("Mega Drive", "libgenesis_plus_gx_libretro_android.so", "md", ButtonSet.SIX, ConsoleSkin(NAVY, NAVY, SLATE, SLATE, NAVY, SLATE)),
+    N64("Nintendo 64", "libmupen64plus_next_gles3_libretro_android.so", "z64", ButtonSet.N64, ConsoleSkin(BLUE, GREEN, YELLOW));
 
     companion object {
         private val GB_LOGO = intArrayOf(0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B)
@@ -64,6 +65,17 @@ enum class GameConsole(
 
         // Detecte la console d'apres le contenu de la ROM, ou null si le format est inconnu
         fun detect(header: ByteArray, ext: String = ""): GameConsole? {
+            if (header.size >= 4) {
+                val b0 = u(header, 0)
+                val b1 = u(header, 1)
+                val b2 = u(header, 2)
+                val b3 = u(header, 3)
+                val z64 = b0 == 0x80 && b1 == 0x37 && b2 == 0x12 && b3 == 0x40
+                val v64 = b0 == 0x37 && b1 == 0x80 && b2 == 0x40 && b3 == 0x12
+                val n64 = b0 == 0x40 && b1 == 0x12 && b2 == 0x37 && b3 == 0x80
+                if (z64 || v64 || n64) return N64
+            }
+
             if (header.size >= 4 &&
                 header[0] == 'N'.code.toByte() &&
                 header[1] == 'E'.code.toByte() &&
@@ -101,6 +113,7 @@ enum class GameConsole(
             if (ext == "sfc" || ext == "smc" || ext == "swc" || ext == "fig") return SNES
             if (ext == "gba") return GBA
             if (ext == "md" || ext == "gen" || ext == "smd") return MD
+            if (ext == "z64" || ext == "n64" || ext == "v64") return N64
             return null
         }
     }
