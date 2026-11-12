@@ -118,8 +118,12 @@ object GameApkMaker {
         add["assets/game/controls.json"] = ControlAdjust.exportJson(context).toByteArray(Charsets.UTF_8)
        
         log("Assemblage de l'APK")
-        ApkRepacker.repack(template, unsigned, replace, add)
-
+        log("Allègement : un seul moteur d'émulation")
+        val gameConsole = GameConsole.fromLabel(game.console)
+        ApkRepacker.repack(template, unsigned, replace, add) { entry ->
+            entry.startsWith("lib/") && entry.endsWith("_libretro_android.so") &&
+                !entry.endsWith("/" + gameConsole.coreLib)
+        }
        log("Signature de l'APK")
         ApkSigning.sign(unsigned, signed)
         unsigned.delete()
