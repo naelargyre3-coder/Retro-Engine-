@@ -115,11 +115,12 @@ object GameApkMaker {
         val add = LinkedHashMap<String, ByteArray>()
         add["assets/game/rom.bin"] = romBytes
         add["assets/game/game.json"] = config.toString().toByteArray(Charsets.UTF_8)
-
+        add["assets/game/controls.json"] = ControlAdjust.exportJson(context).toByteArray(Charsets.UTF_8)
+       
         log("Assemblage de l'APK")
         ApkRepacker.repack(template, unsigned, replace, add)
 
-        log("Signature de l'APK")
+       log("Signature de l'APK")
         ApkSigning.sign(unsigned, signed)
         unsigned.delete()
 
