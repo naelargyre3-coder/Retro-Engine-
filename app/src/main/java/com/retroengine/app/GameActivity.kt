@@ -53,7 +53,8 @@ class GameActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val cfg = if (intent.getBooleanExtra("embedded", false)) EmbeddedGame.load(this) else null
         embedded = cfg
-
+        if (cfg != null) ControlAdjust.importEmbedded(this)
+       
         val gameId: String?
         val rom: File?
         if (cfg != null) {
