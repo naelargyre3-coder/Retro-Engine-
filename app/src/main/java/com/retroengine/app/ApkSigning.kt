@@ -42,7 +42,18 @@ object ApkSigning {
         val cert = ks.getCertificate(ALIAS) as X509Certificate
         return ApkSigner.SignerConfig.Builder("retro-engine", key, listOf(cert)).build()
     }
-
+    // Empreinte SHA-256 du certificat de signature, ou null si la cle n'existe pas encore
+    fun fingerprint(): String? {
+        return try {
+            val ks = KeyStore.getInstance("AndroidKeyStore")
+            ks.load(null)
+            val cert = ks.getCertificate(ALIAS) ?: return null
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(cert.encoded)
+            digest.joinToString(":") { "%02X".format(it) }
+        } catch (e: Exception) {
+            null
+        }
+    }    
     fun sign(input: File, output: File) {
         ApkSigner.Builder(listOf(signerConfig()))
             .setInputApk(input)
