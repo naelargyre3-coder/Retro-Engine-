@@ -183,7 +183,7 @@ class N64TouchOverlay(
         val margin = if (landscape) 0.06f * u else 0.10f * u
 
         // Stick analogique
-        sr = (if (landscape) 0.16f else 0.14f) * u
+        sr = (if (landscape) 0.135f else 0.12f) * u
         sx = left + side + sr
         sy = bottom - margin - sr
         baseShader = LinearGradient(
@@ -196,7 +196,7 @@ class N64TouchOverlay(
         )
 
         // Croix directionnelle, au-dessus du stick
-        dR = (if (landscape) 0.085f else 0.075f) * u
+        dR = (if (landscape) 0.115f else 0.095f) * u
         dX = sx
         dY = sy - sr - 0.04f * u - dR
         val th = dR * 0.62f
@@ -210,19 +210,20 @@ class N64TouchOverlay(
         )
 
         // A et B
-        val rA = (if (landscape) 0.075f else 0.07f) * u
+        val rA = (if (landscape) 0.095f else 0.085f) * u
+        val rightMargin = (if (landscape) 0.12f else 0.14f) * u
         buttonA.r = rA
         buttonA.cx = right - side - rA
-        buttonA.cy = bottom - margin - rA
+        buttonA.cy = bottom - rightMargin - rA
         buttonB.r = rA
         buttonB.cx = buttonA.cx - 2.2f * rA
         buttonB.cy = buttonA.cy - 0.9f * rA
 
         // Les quatre boutons C en losange
-        val rC = (if (landscape) 0.045f else 0.04f) * u
+        val rC = (if (landscape) 0.058f else 0.05f) * u
         val offC = 1.7f * rC
         val ccx = right - side - offC - rC
-        val ccy = buttonA.cy - rA - 0.06f * u - offC - rC
+        val ccy = buttonA.cy - rA - 0.09f * u - offC - rC
         cUp.cx = ccx; cUp.cy = ccy - offC
         cDown.cx = ccx; cDown.cy = ccy + offC
         cLeft.cx = ccx - offC; cLeft.cy = ccy
