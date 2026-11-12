@@ -91,6 +91,12 @@ class MainActivity : ComponentActivity() {
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         column.addView(row, matchWidth())
         column.addView(Button(this).apply {
+        column.addView(Button(this).apply {
+            text = "Modifier les touches"
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, ControlsEditorActivity::class.java))
+            }
+        }, matchWidth())
             text = "Paramètres et confidentialité"
                 setOnClickListener {
                 startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
