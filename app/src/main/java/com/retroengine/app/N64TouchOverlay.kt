@@ -50,7 +50,7 @@ class N64TouchOverlay(
     private val skin: ConsoleSkin,
     private val onKey: (keyCode: Int, pressed: Boolean) -> Unit,
     private val onStick: (right: Boolean, x: Float, y: Float) -> Unit
-) : View(context), PadOverlay {
+) : View(context), PadOverlay, EditableOverlay {
 
     private class Round(val key: Int, val label: String, val colors: ButtonColors) {
         var cx = 0f
@@ -63,7 +63,7 @@ class N64TouchOverlay(
         val rect = RectF()
     }
 
-    // Les touches envoyees au moteur : A = B libretro, B = Y libretro, Z = L2
+    // Touches envoyees au moteur : A = B libretro, B = Y libretro, Z = L2
     private val buttonA = Round(KeyEvent.KEYCODE_BUTTON_B, "A", skin.a)
     private val buttonB = Round(KeyEvent.KEYCODE_BUTTON_Y, "B", skin.b)
     private val faces = listOf(buttonA, buttonB)
@@ -103,6 +103,13 @@ class N64TouchOverlay(
     private var insetR = 0f
     private var insetB = 0f
     private var pressedKeys: Set<Int> = emptySet()
+
+    private var adjust: ControlAdjust? = null
+    private var adjustLandscape = false
+    private val editor = OverlayEditor(this) {
+        layoutControls()
+        invalidate()
+    }
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -147,6 +154,56 @@ class N64TouchOverlay(
         layoutControls()
     }
 
+    // ---------- Edition ----------
+
+    override fun setEditMode(on: Boolean) {
+        editor.active = on
+        if (on) releaseAll()
+        invalidate()
+    }
+
+    override fun scaleSelected(factor: Float) {
+        editor.scaleSelected(factor)
+    }
+
+    override fun resetAdjust() {
+        editor.reset()
+    }
+
+    override fun setSelectionListener(listener: (String?) -> Unit) {
+        editor.listener = listener
+    }
+
+    private fun adjustFor(landscape: Boolean): ControlAdjust {
+        val current = adjust
+        if (current != null && adjustLandscape == landscape) return current
+        val created = ControlAdjust(context, ButtonSet.N64, landscape)
+        adjust = created
+        adjustLandscape = landscape
+        editor.adjust = created
+        return created
+    }
+
+    private fun adjustRounds(list: List<Round>, g: ControlAdjust.G, u: Float) {
+        val mx = list.map { it.cx }.average().toFloat()
+        val my = list.map { it.cy }.average().toFloat()
+        for (b in list) {
+            b.cx = mx + (b.cx - mx) * g.scale + g.dx * u
+            b.cy = my + (b.cy - my) * g.scale + g.dy * u
+            b.r *= g.scale
+        }
+    }
+
+    private fun adjustPill(p: Pill, g: ControlAdjust.G, u: Float) {
+        val cx = p.rect.centerX() + g.dx * u
+        val cy = p.rect.centerY() + g.dy * u
+        val w = p.rect.width() * g.scale
+        val h = p.rect.height() * g.scale
+        p.rect.set(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+    }
+
+    // ---------- Disposition ----------
+
     private fun makeShader(b: Round): Shader =
         RadialGradient(
             b.cx - b.r * 0.3f, b.cy - b.r * 0.3f, b.r * 1.3f,
@@ -181,33 +238,16 @@ class N64TouchOverlay(
         val u = min(w, h)
         val side = 0.04f * u
         val margin = if (landscape) 0.06f * u else 0.10f * u
+        editor.unit = u
+        val adj = adjustFor(landscape)
 
-        // Stick analogique
-        sr = (if (landscape) 0.135f else 0.12f) * u
-        sx = left + side + sr
-        sy = bottom - margin - sr
-        baseShader = LinearGradient(
-            0f, sy - sr, 0f, sy + sr, N_BASE_TOP, N_BASE_BOTTOM, Shader.TileMode.CLAMP
-        )
-        val kr = sr * 0.5f
-        knobShader = RadialGradient(
-            -kr * 0.3f, -kr * 0.3f, kr * 1.3f,
-            N_KNOB_LIGHT, N_KNOB_DARK, Shader.TileMode.CLAMP
-        )
-
-        // Croix directionnelle, au-dessus du stick
-        dR = (if (landscape) 0.115f else 0.095f) * u
-        dX = sx
-        dY = sy - sr - 0.04f * u - dR
-        val th = dR * 0.62f
-        armRects[0].set(dX - th / 2, dY - dR, dX + th / 2, dY - th / 2)
-        armRects[1].set(dX - th / 2, dY + th / 2, dX + th / 2, dY + dR)
-        armRects[2].set(dX - dR, dY - th / 2, dX - th / 2, dY + th / 2)
-        armRects[3].set(dX + th / 2, dY - th / 2, dX + dR, dY + th / 2)
-        plus = plusPath(dX, dY, dR, th, th * 0.3f)
-        plusShader = LinearGradient(
-            0f, dY - dR, 0f, dY + dR, N_PAD_TOP, N_PAD_BOTTOM, Shader.TileMode.CLAMP
-        )
+        // Positions par defaut : stick et croix
+        val sr0 = (if (landscape) 0.15f else 0.13f) * u
+        val sx0 = left + side + sr0
+        val sy0 = bottom - margin - sr0
+        val dR0 = (if (landscape) 0.13f else 0.105f) * u
+        val dX0 = sx0
+        val dY0 = sy0 - sr0 - 0.04f * u - dR0
 
         // A et B
         val rA = (if (landscape) 0.095f else 0.085f) * u
@@ -229,8 +269,6 @@ class N64TouchOverlay(
         cLeft.cx = ccx - offC; cLeft.cy = ccy
         cRight.cx = ccx + offC; cRight.cy = ccy
         for (b in cButtons) b.r = rC
-        for (b in faces) b.shader = makeShader(b)
-        for (b in cButtons) b.shader = makeShader(b)
 
         // Start en bas au centre
         val pillW = 0.2f * u
@@ -248,16 +286,71 @@ class N64TouchOverlay(
             zBtn.rect.set(left + side, y + shH + 0.02f * u, left + side + shW, y + 2 * shH + 0.02f * u)
             rBtn.rect.set(right - side - shW, y, right - side, y + shH)
         } else {
-            val top = min(dY - dR, ccy - offC - rC) - 0.03f * u - shH
+            val top = min(dY0 - dR0, ccy - offC - rC) - 0.03f * u - shH
             lBtn.rect.set(left + side, top, left + side + shW, top + shH)
             zBtn.rect.set(left + side + shW + 0.02f * u, top, left + side + 2 * shW + 0.02f * u, top + shH)
             rBtn.rect.set(right - side - shW, top, right - side, top + shH)
         }
+
+        // Reglages de l'utilisateur
+        val gs = adj.get("stick")
+        sr = sr0 * gs.scale
+        sx = sx0 + gs.dx * u
+        sy = sy0 + gs.dy * u
+        val gd = adj.get("pad")
+        dR = dR0 * gd.scale
+        dX = dX0 + gd.dx * u
+        dY = dY0 + gd.dy * u
+        adjustRounds(faces, adj.get("face"), u)
+        adjustRounds(cButtons, adj.get("c"), u)
+        adjustPill(start, adj.get("start"), u)
+        adjustPill(lBtn, adj.get("l"), u)
+        adjustPill(zBtn, adj.get("z"), u)
+        adjustPill(rBtn, adj.get("r"), u)
+
+        // Formes et degrades
+        baseShader = LinearGradient(
+            0f, sy - sr, 0f, sy + sr, N_BASE_TOP, N_BASE_BOTTOM, Shader.TileMode.CLAMP
+        )
+        val kr = sr * 0.5f
+        knobShader = RadialGradient(
+            -kr * 0.3f, -kr * 0.3f, kr * 1.3f,
+            N_KNOB_LIGHT, N_KNOB_DARK, Shader.TileMode.CLAMP
+        )
+        val th = dR * 0.62f
+        armRects[0].set(dX - th / 2, dY - dR, dX + th / 2, dY - th / 2)
+        armRects[1].set(dX - th / 2, dY + th / 2, dX + th / 2, dY + dR)
+        armRects[2].set(dX - dR, dY - th / 2, dX - th / 2, dY + th / 2)
+        armRects[3].set(dX + th / 2, dY - th / 2, dX + dR, dY + th / 2)
+        plus = plusPath(dX, dY, dR, th, th * 0.3f)
+        plusShader = LinearGradient(
+            0f, dY - dR, 0f, dY + dR, N_PAD_TOP, N_PAD_BOTTOM, Shader.TileMode.CLAMP
+        )
+        for (b in faces) b.shader = makeShader(b)
+        for (b in cButtons) b.shader = makeShader(b)
+
+        // Zones de selection pour l'edition
+        editor.bounds.clear()
+        editor.bounds["stick"] = RectF(sx - sr, sy - sr, sx + sr, sy + sr)
+        editor.bounds["pad"] = RectF(dX - dR, dY - dR, dX + dR, dY + dR)
+        editor.bounds["face"] = RectF(
+            faces.minOf { it.cx - it.r }, faces.minOf { it.cy - it.r },
+            faces.maxOf { it.cx + it.r }, faces.maxOf { it.cy + it.r }
+        )
+        editor.bounds["c"] = RectF(
+            cButtons.minOf { it.cx - it.r }, cButtons.minOf { it.cy - it.r },
+            cButtons.maxOf { it.cx + it.r }, cButtons.maxOf { it.cy + it.r }
+        )
+        editor.bounds["start"] = RectF(start.rect)
+        editor.bounds["l"] = RectF(lBtn.rect)
+        editor.bounds["z"] = RectF(zBtn.rect)
+        editor.bounds["r"] = RectF(rBtn.rect)
     }
 
     // ---------- Touches ----------
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (editor.active) return editor.onTouch(e)
         val ending = e.actionMasked == MotionEvent.ACTION_UP ||
             e.actionMasked == MotionEvent.ACTION_CANCEL
         val skip = if (e.actionMasked == MotionEvent.ACTION_POINTER_UP) e.actionIndex else -1
@@ -471,5 +564,7 @@ class N64TouchOverlay(
             canvas.drawRoundRect(p.rect, radius, radius, stroke)
             canvas.drawText(p.label, p.rect.centerX(), p.rect.centerY() + text.textSize / 3, text)
         }
+
+        editor.draw(canvas)
     }
 }
