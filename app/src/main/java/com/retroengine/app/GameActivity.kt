@@ -224,7 +224,7 @@ class GameActivity : ComponentActivity() {
             savesDirectory = saves.absolutePath
             saveRAMState = saved
             shader = shaderConfig
-                   if (console == GameConsole.N64) {
+            if (console == GameConsole.N64) {
                 variables = arrayOf(
                     Variable("mupen64plus-EnableFBEmulation", "False"),
                     Variable("mupen64plus-EnableCopyColorToRDRAM", "Off"),
