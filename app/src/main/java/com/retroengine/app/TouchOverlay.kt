@@ -40,7 +40,7 @@ class TouchOverlay(
     context: Context,
     private val console: GameConsole,
     private val onKey: (keyCode: Int, pressed: Boolean) -> Unit
-) : View(context) {
+) : View(context), PadOverlay {
 
     private class RoundButton(val key: Int, val label: String, val colors: ButtonColors) {
         var cx = 0f
@@ -326,7 +326,7 @@ class TouchOverlay(
         }
     }
 
-    fun releaseAll() {
+    override fun releaseAll() {
         update(emptySet())
     }
 
