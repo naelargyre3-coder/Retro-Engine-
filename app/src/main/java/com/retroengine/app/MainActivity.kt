@@ -91,8 +91,10 @@ class MainActivity : ComponentActivity() {
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         column.addView(row, matchWidth())
         column.addView(Button(this).apply {
-            text = "Test : créer une copie signée"
-            setOnClickListener { GenerationTest.run(this@MainActivity) }
+            text = "Paramètres et confidentialité"
+                setOnClickListener {
+                startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+            }
         }, matchWidth())
         
         val scroll = ScrollView(this).apply {
