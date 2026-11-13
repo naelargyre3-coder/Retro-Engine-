@@ -13,7 +13,12 @@ data class GameEntry(
     val id: String,
     val name: String,
     val console: String,
-    val addedAt: Long
+    val addedAt: Long,
+    val pkg: String = "",
+    val versionName: String = "1.0",
+    val versionCode: Int = 1,
+    val developer: String = "",
+    val description: String = ""
 )
 
 class GameLibrary(private val context: Context) {
@@ -45,7 +50,12 @@ class GameLibrary(private val context: Context) {
                     o.getString("id"),
                     o.getString("name"),
                     o.optString("console", "NES"),
-                    o.optLong("addedAt", 0L)
+                    o.optLong("addedAt", 0L),
+                    o.optString("pkg", ""),
+                    o.optString("versionName", "1.0"),
+                    o.optInt("versionCode", 1),
+                    o.optString("developer", ""),
+                    o.optString("description", "")
                 )
             }.sortedByDescending { it.addedAt }
         } catch (e: Exception) {
@@ -64,10 +74,16 @@ class GameLibrary(private val context: Context) {
                     .put("name", g.name)
                     .put("console", g.console)
                     .put("addedAt", g.addedAt)
+                    .put("pkg", g.pkg)
+                    .put("versionName", g.versionName)
+                    .put("versionCode", g.versionCode)
+                    .put("developer", g.developer)
+                    .put("description", g.description)
             )
         }
         indexFile.writeText(arr.toString())
     }
+
     private fun rawName(uri: Uri): String {
         var name = ""
         try {
@@ -81,21 +97,9 @@ class GameLibrary(private val context: Context) {
         }
         return name
     }
-    
+
     fun displayName(uri: Uri): String {
-        var name = "Jeu"
-        try {
-            context.contentResolver
-                .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-                ?.use { c ->
-                    if (c.moveToFirst()) {
-                        val n = c.getString(0)
-                        if (!n.isNullOrBlank()) name = n
-                    }
-                }
-        } catch (e: Exception) {
-            // On garde le nom par defaut
-        }
+        val name = rawName(uri).ifBlank { "Jeu" }
         return name.substringBeforeLast('.')
     }
 
@@ -135,8 +139,8 @@ class GameLibrary(private val context: Context) {
         if (console == null) {
             tmp.delete()
             throw IOException(
-            "ROM non reconnue. Formats pris en charge : NES, Game Boy, " +
-                "Game Boy Color, SNES, GBA et Mega Drive (ROM non zippées)."
+                "ROM non reconnue. Formats pris en charge : NES, Game Boy, Game Boy Color, " +
+                    "SNES, GBA, Mega Drive et N64 (ROM non zippées)."
             )
         }
 
@@ -151,7 +155,8 @@ class GameLibrary(private val context: Context) {
             tmp.copyTo(target, overwrite = true)
             tmp.delete()
         }
-        val entry = GameEntry(id, displayName(uri), console.label, System.currentTimeMillis())
+        val base = GameEntry(id, displayName(uri), console.label, System.currentTimeMillis())
+        val entry = base.copy(pkg = GameApkMaker.packageFor(base))
         write(all() + entry)
         return entry
     }
@@ -159,6 +164,30 @@ class GameLibrary(private val context: Context) {
     fun rename(id: String, name: String) {
         write(all().map { if (it.id == id) it.copy(name = name) else it })
     }
+
+    fun updateApkInfo(
+        id: String,
+        pkg: String,
+        versionName: String,
+        developer: String,
+        description: String
+    ) {
+        write(all().map {
+            if (it.id == id) {
+                it.copy(
+                    pkg = pkg,
+                    versionName = versionName,
+                    developer = developer,
+                    description = description
+                )
+            } else {
+                it
+            }
+        })
+    }
+
+    fun packageTaken(pkg: String, exceptId: String): Boolean =
+        all().any { it.id != exceptId && it.pkg == pkg }
 
     fun delete(id: String) {
         File(root, id).deleteRecursively()
