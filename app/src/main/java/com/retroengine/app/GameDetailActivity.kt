@@ -28,6 +28,10 @@ class GameDetailActivity : ComponentActivity() {
     private lateinit var library: GameLibrary
     private lateinit var gameId: String
     private lateinit var nameInput: EditText
+    private lateinit var pkgInput: EditText
+    private lateinit var versionInput: EditText
+    private lateinit var devInput: EditText
+    private lateinit var descInput: EditText
     private lateinit var iconPreview: ImageView
     private lateinit var removeLogoButton: Button
     private var originalName = ""
@@ -68,6 +72,29 @@ class GameDetailActivity : ComponentActivity() {
         }
     }
 
+    private fun label(text: String): TextView = TextView(this).apply {
+        this.text = text
+        textSize = 14f
+        setTextColor(0xFF9FA8FF.toInt())
+        setPadding(0, dp(12), 0, dp(4))
+    }
+
+    private fun input(value: String, hintText: String, multiLine: Boolean = false): EditText =
+        EditText(this).apply {
+            setText(value)
+            hint = hintText
+            setTextColor(0xFFFFFFFF.toInt())
+            setHintTextColor(0xFF777777.toInt())
+            if (multiLine) {
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                setSingleLine(false)
+                minLines = 2
+            } else {
+                inputType = InputType.TYPE_CLASS_TEXT
+                setSingleLine(true)
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         library = GameLibrary(this)
@@ -90,20 +117,8 @@ class GameDetailActivity : ComponentActivity() {
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(0xFFFFFFFF.toInt())
         })
-        column.addView(TextView(this).apply {
-            text = "Nom du jeu"
-            textSize = 14f
-            setTextColor(0xFF9FA8FF.toInt())
-            setPadding(0, dp(16), 0, dp(4))
-        })
-        nameInput = EditText(this).apply {
-            setText(game.name)
-            setSingleLine(true)
-            inputType = InputType.TYPE_CLASS_TEXT
-            setTextColor(0xFFFFFFFF.toInt())
-            setHintTextColor(0xFF777777.toInt())
-            hint = "Nom du jeu"
-        }
+        column.addView(label("Nom du jeu"))
+        nameInput = input(game.name, "Nom du jeu")
         column.addView(nameInput)
         column.addView(TextView(this).apply {
             text = "Console : ${game.console}"
@@ -112,13 +127,15 @@ class GameDetailActivity : ComponentActivity() {
             setPadding(0, dp(8), 0, dp(8))
         })
 
+        val matchWidth = {
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
         // Logo
-        column.addView(TextView(this).apply {
-            text = "Logo du jeu"
-            textSize = 14f
-            setTextColor(0xFF9FA8FF.toInt())
-            setPadding(0, dp(8), 0, dp(4))
-        })
+        column.addView(label("Logo du jeu"))
         iconPreview = ImageView(this).apply {
             scaleType = ImageView.ScaleType.FIT_CENTER
             background = GradientDrawable().apply {
@@ -132,14 +149,6 @@ class GameDetailActivity : ComponentActivity() {
             iconPreview,
             LinearLayout.LayoutParams(dp(96), dp(96)).apply { bottomMargin = dp(8) }
         )
-
-        val matchWidth = {
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        }
-
         column.addView(Button(this).apply {
             text = "Choisir un logo"
             setOnClickListener {
@@ -147,7 +156,6 @@ class GameDetailActivity : ComponentActivity() {
                 pickImage.launch(arrayOf("image/png", "image/jpeg"))
             }
         }, matchWidth())
-
         removeLogoButton = Button(this).apply {
             text = "Retirer le logo"
             setOnClickListener {
@@ -156,26 +164,56 @@ class GameDetailActivity : ComponentActivity() {
             }
         }
         column.addView(removeLogoButton, matchWidth())
-               
+
+        // Informations de l'APK
+        column.addView(TextView(this).apply {
+            text = "Informations de l'APK"
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding(0, dp(20), 0, dp(0))
+        })
+        column.addView(label("Identifiant Android (unique)"))
+        pkgInput = input(
+            game.pkg.ifBlank { GameApkMaker.packageFor(game) },
+            "com.moi.monjeu"
+        )
+        column.addView(pkgInput)
+        column.addView(Button(this).apply {
+            text = "Identifiant par défaut"
+            setOnClickListener { pkgInput.setText(GameApkMaker.packageFor(library.get(gameId) ?: game)) }
+        }, matchWidth())
+        column.addView(label("Version"))
+        versionInput = input(game.versionName, "1.0")
+        column.addView(versionInput)
+        column.addView(label("Développeur (facultatif)"))
+        devInput = input(game.developer, "Nom affiché")
+        column.addView(devInput)
+        column.addView(label("Description (facultative)"))
+        descInput = input(game.description, "Quelques mots sur le jeu", multiLine = true)
+        column.addView(descInput)
+
         column.addView(Button(this).apply {
             text = "Générer l'APK du jeu"
             setOnClickListener {
+                if (!saveApkInfo(true)) return@setOnClickListener
                 saveName()
                 GameApkFlow.generate(this@GameDetailActivity, gameId)
             }
         }, matchWidth().apply { topMargin = dp(16) })
-      
+
         column.addView(Button(this).apply {
             text = "Jouer"
             setOnClickListener {
                 saveName()
+                saveApkInfo(false)
                 startActivity(
                     Intent(this@GameDetailActivity, GameActivity::class.java)
                         .putExtra("gameId", gameId)
                 )
                 finish()
             }
-        }, matchWidth().apply { topMargin = dp(16) })
+        }, matchWidth())
 
         column.addView(Button(this).apply {
             text = "Supprimer le jeu"
@@ -186,6 +224,7 @@ class GameDetailActivity : ComponentActivity() {
             text = "Terminé"
             setOnClickListener {
                 saveName()
+                saveApkInfo(false)
                 finish()
             }
         }, matchWidth())
@@ -228,8 +267,35 @@ class GameDetailActivity : ComponentActivity() {
         }
     }
 
+    // Verifie puis enregistre les informations de l'APK. Renvoie false si elles sont invalides.
+    private fun saveApkInfo(showError: Boolean): Boolean {
+        if (!::pkgInput.isInitialized) return false
+        val pkg = pkgInput.text.toString().trim()
+        val version = versionInput.text.toString().trim()
+        val developer = devInput.text.toString().trim()
+        val description = descInput.text.toString().trim()
+
+        val error = GameApkMaker.validatePackage(pkg, packageName)
+            ?: when {
+                library.packageTaken(pkg, gameId) ->
+                    "Cet identifiant est déjà utilisé par un autre jeu."
+                !Regex("[0-9A-Za-z._-]{1,20}").matches(version) ->
+                    "Version invalide : lettres, chiffres, . _ - (20 caractères maximum)."
+                developer.length > 60 -> "Nom du développeur trop long (60 caractères maximum)."
+                description.length > 300 -> "Description trop longue (300 caractères maximum)."
+                else -> null
+            }
+        if (error != null) {
+            if (showError) Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+            return false
+        }
+        library.updateApkInfo(gameId, pkg, version, developer, description)
+        return true
+    }
+
     override fun onPause() {
         saveName()
+        saveApkInfo(false)
         super.onPause()
     }
 
