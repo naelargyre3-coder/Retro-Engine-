@@ -15,7 +15,9 @@ import java.util.zip.ZipFile
 
 object GameApkMaker {
 
-    // Identifiant Android unique et valide, stable pour un même jeu
+    private val PACKAGE_REGEX = Regex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
+
+    // Identifiant par defaut, unique et valide, stable pour un meme jeu
     fun packageFor(game: GameEntry): String {
         val plain = Normalizer.normalize(game.name, Normalizer.Form.NFD)
             .replace(Regex("\\p{M}+"), "")
@@ -26,6 +28,26 @@ object GameApkMaker {
         return "com.retroengine.game.${slug}_${game.id.substring(0, 6)}"
     }
 
+    fun packageOf(game: GameEntry): String =
+        if (game.pkg.isNotBlank()) game.pkg else packageFor(game)
+
+    // Renvoie un message d'erreur, ou null si l'identifiant est valide
+    fun validatePackage(pkg: String, toolPackage: String): String? {
+        if (pkg.isEmpty()) return "L'identifiant est vide."
+        if (pkg.length > 120) return "Identifiant trop long (120 caractères maximum)."
+        if (!PACKAGE_REGEX.matches(pkg)) {
+            return "Identifiant invalide : lettres minuscules, chiffres et _, au moins deux " +
+                "parties séparées par des points (par exemple com.moi.monjeu)."
+        }
+        if (pkg == toolPackage || pkg.startsWith("$toolPackage.")) {
+            return "Cet identifiant est réservé à Retro Engine."
+        }
+        if (pkg.startsWith("android.") || pkg.startsWith("com.android.")) {
+            return "Cet identifiant est réservé à Android."
+        }
+        return null
+    }
+
     private fun isClass(name: String, loader: ClassLoader): Boolean =
         try {
             Class.forName(name, false, loader)
@@ -34,7 +56,7 @@ object GameApkMaker {
             false
         }
 
-    // Icône adaptative : le logo est placé dans la zone sûre, centré
+    // Icone adaptative : le logo est place dans la zone sure, centre
     private fun foregroundPng(iconFile: File): ByteArray {
         val src = BitmapFactory.decodeFile(iconFile.path)
             ?: throw IOException("Logo illisible.")
@@ -58,8 +80,17 @@ object GameApkMaker {
         val romFile = library.romFile(game.id)
         if (!romFile.exists()) throw IOException("ROM introuvable pour ce jeu.")
 
-        val newPackage = packageFor(game)
+        val newPackage = packageOf(game)
         val oldPackage = context.packageName
+        val packageError = validatePackage(newPackage, oldPackage)
+        if (packageError != null) throw IOException(packageError)
+        val gameConsole = GameConsole.fromLabel(game.console)
+        val toolVersion = try {
+            context.packageManager.getPackageInfo(oldPackage, 0).versionName ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+
         val template = File(context.applicationInfo.sourceDir)
         val outDir = File(context.cacheDir, "generated").apply { mkdirs() }
         val unsigned = File(outDir, "unsigned.apk")
@@ -79,12 +110,13 @@ object GameApkMaker {
                 .firstOrNull { it.endsWith("ic_launcher_foreground.png") }
         }
 
-        log("Personnalisation du manifeste (nom, identifiant)")
+        log("Personnalisation du manifeste (nom, identifiant, version)")
         val loader = context.classLoader
         val patched = AxmlPatcher.patchStrings(manifest) { s ->
             when {
                 s == oldPackage -> newPackage
                 s == "Retro Engine" -> game.name
+                toolVersion.isNotEmpty() && s == toolVersion -> game.versionName
                 s.startsWith("$oldPackage.") && !isClass(s, loader) ->
                     newPackage + s.substring(oldPackage.length)
                 else -> s
@@ -109,22 +141,26 @@ object GameApkMaker {
         val config = JSONObject()
             .put("id", game.id)
             .put("name", game.name)
-            .put("console", GameConsole.fromLabel(game.console).name)
+            .put("console", gameConsole.name)
             .put("filter", GraphicsSettings.filter(context).name)
             .put("orientation", GraphicsSettings.orientation(context).name)
+            .put("versionName", game.versionName)
+            .put("developer", game.developer)
+            .put("description", game.description)
         val add = LinkedHashMap<String, ByteArray>()
         add["assets/game/rom.bin"] = romBytes
         add["assets/game/game.json"] = config.toString().toByteArray(Charsets.UTF_8)
-        add["assets/game/controls.json"] = ControlAdjust.exportJson(context).toByteArray(Charsets.UTF_8)
-       
-        log("Assemblage de l'APK")
+        add["assets/game/controls.json"] =
+            ControlAdjust.exportJson(context).toByteArray(Charsets.UTF_8)
+
         log("Allègement : un seul moteur d'émulation")
-        val gameConsole = GameConsole.fromLabel(game.console)
+        log("Assemblage de l'APK")
         ApkRepacker.repack(template, unsigned, replace, add) { entry ->
             entry.startsWith("lib/") && entry.endsWith("_libretro_android.so") &&
                 !entry.endsWith("/" + gameConsole.coreLib)
         }
-       log("Signature de l'APK")
+
+        log("Signature de l'APK")
         ApkSigning.sign(unsigned, signed)
         unsigned.delete()
 
