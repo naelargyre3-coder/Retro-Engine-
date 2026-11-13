@@ -49,5 +49,8 @@
             android:name=".ControlsEditorActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|layoutDirection" />
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false" />
     </application>
 </manifest>
