@@ -12,8 +12,9 @@ import java.io.File
 
 object GameApkFlow {
 
-    fun generate(activity: ComponentActivity, gameId: String) {
+    fun generate(activity: ComponentActivity, gameId: String, onDone: () -> Unit = {}) {
         val game = GameLibrary(activity).get(gameId) ?: return
+        val pkg = GameApkMaker.packageOf(game)
         val steps = StringBuffer()
         val dialog = AlertDialog.Builder(activity)
             .setTitle("Génération de l'APK")
@@ -31,34 +32,55 @@ object GameApkFlow {
                 }
             }
             dialog.dismiss()
-            val file = result.getOrNull()
-            if (file != null) {
+            val built = result.getOrNull()
+            val now = System.currentTimeMillis()
+            if (built != null) {
+                val safeVersion = game.versionName.replace(Regex("[^0-9A-Za-z._-]"), "_")
+                val name = "$pkg-$safeVersion.apk"
+                val kept = BuildHistory.keep(activity, built, name)
+                built.delete()
+                BuildHistory.add(
+                    activity,
+                    BuildRecord(
+                        now, game.id, game.name, game.console, pkg, game.versionName,
+                        true, kept.length() / 1024, name, "Signature vérifiée"
+                    )
+                )
+                onDone()
                 AlertDialog.Builder(activity)
                     .setTitle("APK créé")
                     .setMessage(
-                        "${game.name}\n" +
-                            "Identifiant : ${GameApkMaker.packageFor(game)}\n" +
-                            "Taille : ${file.length() / 1024} Ko\n\n" +
-                            "$steps\nSignature vérifiée."
+                        "${game.name} (version ${game.versionName})\n" +
+                            "Identifiant : $pkg\n" +
+                            "Taille : ${kept.length() / 1024} Ko\n\n" +
+                            "$steps\nSignature vérifiée.\n" +
+                            "L'APK est conservé dans l'historique."
                     )
-                    .setPositiveButton("Installer") { _, _ -> GameApkBuilder.install(activity, file) }
-                    .setNeutralButton("Partager") { _, _ -> share(activity, file) }
+                    .setPositiveButton("Installer") { _, _ -> GameApkBuilder.install(activity, kept) }
+                    .setNeutralButton("Partager") { _, _ -> share(activity, kept) }
                     .setNegativeButton("Fermer", null)
                     .show()
             } else {
                 val e = result.exceptionOrNull()
+                val message = "${e?.javaClass?.simpleName} : ${e?.message}"
+                BuildHistory.add(
+                    activity,
+                    BuildRecord(
+                        now, game.id, game.name, game.console, pkg, game.versionName,
+                        false, 0, "", "$message\n\nÉtapes réalisées :\n$steps"
+                    )
+                )
+                onDone()
                 AlertDialog.Builder(activity)
                     .setTitle("Échec de la génération")
-                    .setMessage(
-                        "${e?.javaClass?.simpleName} : ${e?.message}\n\nÉtapes réalisées :\n$steps"
-                    )
+                    .setMessage("$message\n\nÉtapes réalisées :\n$steps")
                     .setPositiveButton("OK", null)
                     .show()
             }
         }
     }
 
-    private fun share(activity: ComponentActivity, file: File) {
+    fun share(activity: ComponentActivity, file: File) {
         val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
         val send = Intent(Intent.ACTION_SEND)
             .setType("application/vnd.android.package-archive")
