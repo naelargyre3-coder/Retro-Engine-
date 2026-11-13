@@ -76,7 +76,8 @@ class SettingsActivity : ComponentActivity() {
         val library = GameLibrary(this)
         val gamesCount = library.all().size
         val gamesSize = dirSize(File(filesDir, "games")) + dirSize(File(filesDir, "saves"))
-        val tempSize = dirSize(File(cacheDir, "generated")) + dirSize(File(cacheDir, "icon_source.png"))
+        val tempSize = dirSize(File(cacheDir, "generated")) +
+            dirSize(File(cacheDir, "icon_source.png")) + dirSize(File(filesDir, "apks"))
 
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -99,6 +100,7 @@ class SettingsActivity : ComponentActivity() {
         )
         column.addView(button("Supprimer les APK générés") {
             File(cacheDir, "generated").deleteRecursively()
+            BuildHistory.deleteAllApks(this)
             File(cacheDir, "icon_source.png").delete()
             Toast.makeText(this, "APK générés supprimés.", Toast.LENGTH_SHORT).show()
             render()
