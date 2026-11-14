@@ -16,6 +16,18 @@ class ControlAdjust(
 
     private fun prefix(): String = "${set.name}_${if (landscape) "L" else "P"}_"
 
+    // Un groupe masque est simplement deplace hors de l'ecran
+    fun isHidden(name: String): Boolean = get(name).dx > 10f
+
+    fun hide(name: String) {
+        val g = get(name)
+        if (g.dx <= 10f) g.dx += 20f
+    }
+
+    fun show(name: String) {
+        val g = get(name)
+        if (g.dx > 10f) g.dx -= 20f
+    }
     fun get(name: String): G = groups.getOrPut(name) { load(name) }
 
     private fun load(name: String): G {
