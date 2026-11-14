@@ -53,7 +53,7 @@ class TouchOverlay(
         val rect = RectF()
     }
 
-    private val skin = console.skin
+    private val skin = TouchStyle.skinFor(context, console)
     private val six = console.buttonSet == ButtonSet.SIX
     private val four = console.buttonSet == ButtonSet.FOUR_SHOULDER
     private val hasShoulders =
@@ -181,6 +181,16 @@ class TouchOverlay(
         editor.reset()
     }
 
+        override fun toggleHiddenSelected() {
+        editor.toggleHidden()
+    }
+
+    override fun hiddenGroups(): List<String> = editor.hiddenNames()
+
+    override fun showGroup(name: String) {
+        editor.showGroup(name)
+    }
+    
     override fun setSelectionListener(listener: (String?) -> Unit) {
         editor.listener = listener
     }
