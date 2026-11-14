@@ -13,6 +13,9 @@ interface EditableOverlay {
     fun scaleSelected(factor: Float)
     fun resetAdjust()
     fun setSelectionListener(listener: (String?) -> Unit)
+    fun toggleHiddenSelected()
+    fun hiddenGroups(): List<String>
+    fun showGroup(name: String)
 }
 
 // Gere la selection, le deplacement et le redimensionnement des groupes de touches
@@ -121,6 +124,26 @@ class OverlayEditor(private val view: View, private val relayout: () -> Unit) {
         relayout()
     }
 
+      fun toggleHidden() {
+        val name = selected ?: return
+        val a = adjust ?: return
+        if (a.isHidden(name)) a.show(name) else a.hide(name)
+        a.save()
+        relayout()
+    }
+
+    fun hiddenNames(): List<String> {
+        val a = adjust ?: return emptyList()
+        return bounds.keys.filter { a.isHidden(it) }
+    }
+
+    fun showGroup(name: String) {
+        val a = adjust ?: return
+        a.show(name)
+        a.save()
+        relayout()
+    }  
+    
     fun draw(canvas: Canvas) {
         if (!active) return
         for ((name, r) in bounds) {
