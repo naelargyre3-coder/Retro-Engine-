@@ -1,13 +1,16 @@
 package com.retroengine.app
 
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
 import android.hardware.input.InputManager
 import android.os.Bundle
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -16,7 +19,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.swordfish.libretrodroid.GLRetroView
 import com.swordfish.libretrodroid.GLRetroViewData
-import com.swordfish.libretrodroid.Variable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -28,6 +30,7 @@ class GameActivity : ComponentActivity() {
     private var retroView: GLRetroView? = null
     private var touchOverlay: View? = null
     private var overlayHidden = false
+    private var manualHidden = false
     private var sramFile: File? = null
     private var lastSram: ByteArray? = null
     private var inputManager: InputManager? = null
@@ -49,12 +52,14 @@ class GameActivity : ComponentActivity() {
         override fun onInputDeviceChanged(deviceId: Int) = updateOverlay()
     }
 
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val cfg = if (intent.getBooleanExtra("embedded", false)) EmbeddedGame.load(this) else null
         embedded = cfg
         if (cfg != null) ControlAdjust.importEmbedded(this)
-       
+
         val gameId: String?
         val rom: File?
         if (cfg != null) {
@@ -146,24 +151,43 @@ class GameActivity : ComponentActivity() {
         return super.dispatchGenericMotionEvent(event)
     }
 
+    // ---------- Touches tactiles : modes d'affichage ----------
+
     private fun updateOverlay() {
         val overlay = touchOverlay ?: return
-        val hide = hasGamepad()
+        val hide = when (TouchStyle.mode(this)) {
+            TouchStyle.Mode.ALWAYS -> false
+            TouchStyle.Mode.MANUAL -> manualHidden
+            TouchStyle.Mode.AUTO -> hasGamepad()
+        }
         if (hide == overlayHidden) return
         overlayHidden = hide
+        val animate = TouchStyle.animations(this)
+        val alpha = TouchStyle.opacity(this)
         if (hide) {
             (overlay as? PadOverlay)?.releaseAll()
-            overlay.animate()
-                .alpha(0f).scaleX(0.92f).scaleY(0.92f)
-                .setDuration(250)
-                .withEndAction { if (overlayHidden) overlay.visibility = View.GONE }
-                .start()
+            if (animate) {
+                overlay.animate()
+                    .alpha(0f).scaleX(0.92f).scaleY(0.92f)
+                    .setDuration(250)
+                    .withEndAction { if (overlayHidden) overlay.visibility = View.GONE }
+                    .start()
+            } else {
+                overlay.alpha = 0f
+                overlay.visibility = View.GONE
+            }
         } else {
             overlay.visibility = View.VISIBLE
-            overlay.animate()
-                .alpha(1f).scaleX(1f).scaleY(1f)
-                .setDuration(250)
-                .start()
+            if (animate) {
+                overlay.animate()
+                    .alpha(alpha).scaleX(1f).scaleY(1f)
+                    .setDuration(250)
+                    .start()
+            } else {
+                overlay.alpha = alpha
+                overlay.scaleX = 1f
+                overlay.scaleY = 1f
+            }
         }
     }
 
@@ -225,14 +249,6 @@ class GameActivity : ComponentActivity() {
             savesDirectory = saves.absolutePath
             saveRAMState = saved
             shader = shaderConfig
-            if (console == GameConsole.N64) {
-                variables = arrayOf(
-                    Variable("mupen64plus-EnableFBEmulation", "False"),
-                    Variable("mupen64plus-EnableCopyColorToRDRAM", "Off"),
-                    Variable("mupen64plus-EnableCopyDepthToRDRAM", "Off"),
-                    Variable("mupen64plus-EnableLODEmulation", "False")
-                )
-            }
         }
         val view = GLRetroView(this, data)
         retroView = view
@@ -243,7 +259,7 @@ class GameActivity : ComponentActivity() {
             view.sendKeyEvent(action, keyCode, 0)
         }
         val overlay: View = if (console == GameConsole.N64) {
-            N64TouchOverlay(this, console.skin, keyCallback) { right, x, y ->
+            N64TouchOverlay(this, TouchStyle.skinFor(this, console), keyCallback) { right, x, y ->
                 val source = if (right) {
                     GLRetroView.MOTION_SOURCE_ANALOG_RIGHT
                 } else {
@@ -254,8 +270,10 @@ class GameActivity : ComponentActivity() {
         } else {
             TouchOverlay(this, console, keyCallback)
         }
+        overlay.alpha = TouchStyle.opacity(this)
         touchOverlay = overlay
         overlayHidden = false
+        manualHidden = false
 
         val frame = FrameLayout(this)
         frame.addView(
@@ -272,6 +290,31 @@ class GameActivity : ComponentActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         )
+
+        // Mode manuel : petit bouton discret pour afficher ou masquer les touches
+        if (TouchStyle.mode(this) == TouchStyle.Mode.MANUAL) {
+            val toggle = TextView(this).apply {
+                text = "\u22EE"
+                textSize = 20f
+                setTextColor(0xFFFFFFFF.toInt())
+                gravity = Gravity.CENTER
+                alpha = 0.6f
+                background = GradientDrawable().apply {
+                    setColor(0x66000000)
+                    cornerRadius = dp(18).toFloat()
+                }
+                setOnClickListener {
+                    manualHidden = !manualHidden
+                    updateOverlay()
+                }
+            }
+            frame.addView(
+                toggle,
+                FrameLayout.LayoutParams(
+                    dp(36), dp(36), Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                ).apply { topMargin = dp(8) }
+            )
+        }
         setContentView(frame)
 
         val manager = getSystemService(Context.INPUT_SERVICE) as InputManager
