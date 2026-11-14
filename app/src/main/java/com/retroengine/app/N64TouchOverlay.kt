@@ -170,6 +170,16 @@ class N64TouchOverlay(
         editor.reset()
     }
 
+    override fun toggleHiddenSelected() {
+        editor.toggleHidden()
+    }
+
+    override fun hiddenGroups(): List<String> = editor.hiddenNames()
+
+    override fun showGroup(name: String) {
+        editor.showGroup(name)
+    }
+    
     override fun setSelectionListener(listener: (String?) -> Unit) {
         editor.listener = listener
     }
