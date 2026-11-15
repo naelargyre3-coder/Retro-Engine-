@@ -9,6 +9,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Installer CMake 3.22.1
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "cmake;3.22.1"
       - name: Cloner LibretroDroid 0.13.2
         run: git clone --depth 1 --branch 0.13.2 --recursive https://github.com/Swordfish90/LibretroDroid.git ld
       - name: Compiler le module
