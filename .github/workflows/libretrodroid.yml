@@ -1,0 +1,22 @@
+name: Build LibretroDroid
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Cloner LibretroDroid 0.13.2
+        run: git clone --depth 1 --branch 0.13.2 --recursive https://github.com/Swordfish90/LibretroDroid.git ld
+      - name: Compiler le module
+        working-directory: ld
+        run: |
+          chmod +x gradlew
+          ./gradlew :libretrodroid:assembleRelease --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libretrodroid-aar
+          path: ld/libretrodroid/build/outputs/aar/*.aar
