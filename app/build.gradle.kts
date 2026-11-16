@@ -30,7 +30,7 @@ android {
 }
 
 dependencies {
-    implementation("com.github.Swordfish90:LibretroDroid:0.13.2")
+    implementation(files("libs/libretrodroid.aar"))
     implementation("androidx.activity:activity-ktx:1.9.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
