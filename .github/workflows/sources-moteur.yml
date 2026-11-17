@@ -1,0 +1,21 @@
+name: Extraire les sources du moteur
+on:
+  workflow_dispatch:
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cloner LibretroDroid 0.13.2
+        run: git clone --depth 1 --branch 0.13.2 https://github.com/Swordfish90/LibretroDroid.git ld
+      - name: Rassembler les fichiers utiles
+        run: |
+          mkdir out
+          find ld/libretrodroid/src/main -type f | sort > out/liste-fichiers.txt
+          grep -rlE "ShaderManager|ShaderConfig" ld/libretrodroid/src/main --include=*.cpp --include=*.h --include=*.kt --include=*.java | while read f; do
+            cp "$f" "out/$(echo "$f" | tr '/' '_')"
+          done
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sources-moteur
+          path: out/*
